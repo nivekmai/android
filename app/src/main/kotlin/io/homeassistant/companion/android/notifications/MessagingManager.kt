@@ -135,6 +135,7 @@ class MessagingManager @Inject constructor(
     private val assistConfigManager: AssistConfigManager,
     private val defaultAssistantManager: DefaultAssistantManager,
     private val bluetoothSensorManager: BluetoothSensorManager,
+    private val alarmCommandManager: AlarmCommandManager,
 ) {
     companion object {
         const val APP_PREFIX = "app://"
@@ -187,6 +188,7 @@ class MessagingManager @Inject constructor(
         const val COMMAND_BLUETOOTH = "command_bluetooth"
         const val COMMAND_SCREEN_ON = "command_screen_on"
         const val COMMAND_MEDIA = "command_media"
+        const val COMMAND_ALARM = "command_alarm"
         const val COMMAND_HIGH_ACCURACY_MODE = "command_high_accuracy_mode"
         const val COMMAND_ACTIVITY = "command_activity"
         const val COMMAND_WEBVIEW = "command_webview"
@@ -224,6 +226,12 @@ class MessagingManager @Inject constructor(
         const val MEDIA_PACKAGE_NAME = "media_package_name"
         const val MEDIA_COMMAND = "media_command"
 
+        // Alarm command parameters
+        const val ALARM_HOUR = "alarm_hour"
+        const val ALARM_MINUTE = "alarm_minute"
+        const val ALARM_MESSAGE = "alarm_message"
+        const val ALARM_SKIP_UI = "alarm_skip_ui"
+
         // App-lock command parameters:
         const val APP_LOCK_ENABLED = "app_lock_enabled"
         const val APP_LOCK_TIMEOUT = "app_lock_timeout"
@@ -248,6 +256,7 @@ class MessagingManager @Inject constructor(
             COMMAND_WEBVIEW,
             COMMAND_SCREEN_ON,
             COMMAND_MEDIA,
+            COMMAND_ALARM,
             DeviceCommandData.COMMAND_UPDATE_SENSORS,
             COMMAND_LAUNCH_APP,
             COMMAND_APP_LOCK,
@@ -562,6 +571,15 @@ class MessagingManager @Inject constructor(
                             }
                         }
 
+                        COMMAND_ALARM -> {
+                            if (jsonData.toAlarmCommand() != null) {
+                                handleDeviceCommands(jsonData)
+                            } else {
+                                Timber.d("Invalid alarm command received, posting notification to device")
+                                sendNotification(jsonData)
+                            }
+                        }
+
                         DeviceCommandData.COMMAND_UPDATE_SENSORS -> SensorReceiver.updateAllSensors(context)
                         COMMAND_LAUNCH_APP -> {
                             if (!jsonData[PACKAGE_NAME].isNullOrEmpty()) {
@@ -849,6 +867,10 @@ class MessagingManager @Inject constructor(
                 } else {
                     processMediaCommand(data)
                 }
+            }
+
+            COMMAND_ALARM -> {
+                data.toAlarmCommand()?.let(alarmCommandManager::setAlarm)
             }
 
             COMMAND_LAUNCH_APP -> {
