@@ -2,6 +2,7 @@ package io.homeassistant.companion.android.assist.service
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -23,6 +24,12 @@ import timber.log.Timber
  */
 class AssistVoiceInteractionSession(context: Context) : VoiceInteractionSession(context) {
 
+    override fun onPrepareShow(args: Bundle?, showFlags: Int) {
+        // Assist uses its existing activity for UI, so don't create an empty session window.
+        setUiEnabled(false)
+        super.onPrepareShow(args, showFlags)
+    }
+
     override fun onShow(args: Bundle?, showFlags: Int) {
         super.onShow(args, showFlags)
         Timber.d("VoiceInteractionSession onShow, flags: $showFlags")
@@ -34,8 +41,14 @@ class AssistVoiceInteractionSession(context: Context) : VoiceInteractionSession(
         val intent = AssistActivity.newInstance(
             context = context,
             wakeWordPhrase = wakeWord,
-        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(intent)
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Use the assistant-specific launch path so Android permits the activity to surface
+            // from this background voice interaction session.
+            startAssistantActivity(intent)
+        } else {
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
 
         // Finish this session since the activity will handle everything
 
