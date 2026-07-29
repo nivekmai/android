@@ -2,7 +2,7 @@
 <changelog xmlns:tools="http://schemas.android.com/tools"
     tools:ignore="MissingDefaultResource">
     <release version="2026.7.5 - Main" versioncode="3">
-        <change>Fixed Assist UI not appearing when the app is selected as the system assistant</change>
+        <change>Debug prototype uses the established ACTION_ASSIST activity path for system assistant launches</change>
         <change>Added a notification command for creating alarms in the phone clock app</change>
         <change>Android 17: added assistant volume level sensor + notification command for control</change>
         <change>Health Connect sleep duration sensor now ignores awake and out of bed time</change>
