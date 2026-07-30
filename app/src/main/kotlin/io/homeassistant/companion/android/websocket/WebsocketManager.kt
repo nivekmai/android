@@ -33,7 +33,6 @@ import io.homeassistant.companion.android.common.util.SdkVersion
 import io.homeassistant.companion.android.database.settings.SettingsDao
 import io.homeassistant.companion.android.database.settings.WebsocketSetting
 import io.homeassistant.companion.android.launch.LaunchActivity
-import io.homeassistant.companion.android.notifications.MessagingManager
 import io.homeassistant.companion.android.settings.SettingsActivity
 import io.homeassistant.companion.android.util.hasActiveConnection
 import java.util.concurrent.TimeUnit
@@ -41,6 +40,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -53,7 +53,6 @@ class WebsocketManager(appContext: Context, workerParams: WorkerParameters) :
     companion object {
         private const val UNIQUE_WORK_NAME = "WebSocketManager"
         private const val OLD_UNIQUE_WORK_NAME = "WebSockManager"
-        private const val SOURCE = "Websocket"
         private const val NOTIFICATION_ID = 65423
         private const val NOTIFICATION_RESTRICTED_ID = 65424
         private val DEFAULT_WEBSOCKET_SETTING = if (BuildConfig.FLAVOR ==
@@ -63,8 +62,6 @@ class WebsocketManager(appContext: Context, workerParams: WorkerParameters) :
         } else {
             WebsocketSetting.ALWAYS
         }
-        private val ACTION_EXTRA_KEYS = listOf("uri", "behavior", "authenticationRequired")
-
         suspend fun start(context: Context) {
             val websocketNotifications =
                 PeriodicWorkRequestBuilder<WebsocketManager>(15, TimeUnit.MINUTES)
@@ -102,7 +99,8 @@ class WebsocketManager(appContext: Context, workerParams: WorkerParameters) :
         .fromApplication(applicationContext, WebsocketManagerEntryPoint::class.java)
 
     private val serverManager: ServerManager = entryPoint.serverManager()
-    private val messagingManager: MessagingManager = entryPoint.messagingManager()
+    private val websocketNotificationManager: WebsocketNotificationManager =
+        entryPoint.websocketNotificationManager()
     private val settingsDao: SettingsDao = entryPoint.settingsDao()
     private val checkLocalNetworkPermission: CheckLocalNetworkPermissionUseCase =
         entryPoint.checkLocalNetworkPermission()
@@ -111,7 +109,7 @@ class WebsocketManager(appContext: Context, workerParams: WorkerParameters) :
     @InstallIn(SingletonComponent::class)
     interface WebsocketManagerEntryPoint {
         fun serverManager(): ServerManager
-        fun messagingManager(): MessagingManager
+        fun websocketNotificationManager(): WebsocketNotificationManager
         fun settingsDao(): SettingsDao
         fun checkLocalNetworkPermission(): CheckLocalNetworkPermissionUseCase
     }
@@ -198,42 +196,11 @@ class WebsocketManager(appContext: Context, workerParams: WorkerParameters) :
     }
 
     private suspend fun collectNotifications(serverId: Int) {
-        serverManager.webSocketRepository(serverId).getNotifications()?.collect {
-            if (it.containsKey("hass_confirm_id")) {
-                try {
-                    serverManager.webSocketRepository(serverId).ackNotification(it["hass_confirm_id"].toString())
-                } catch (e: Exception) {
-                    Timber.e(e, "Unable to confirm received notification")
-                }
-            }
-            val flattened = mutableMapOf<String, String>()
-            if (it.containsKey("data")) {
-                for ((key, value) in it["data"] as Map<*, *>) {
-                    if (key == "actions" && value is List<*>) {
-                        value.forEachIndexed { i, action ->
-                            if (action is Map<*, *>) {
-                                flattened["action_${i + 1}_key"] = action["action"].toString()
-                                flattened["action_${i + 1}_title"] = action["title"].toString()
-                                for (key in ACTION_EXTRA_KEYS) {
-                                    action[key]?.let { value -> flattened["action_${i + 1}_$key"] = value.toString() }
-                                }
-                            }
-                        }
-                    } else {
-                        flattened[key.toString()] = value.toString()
-                    }
-                }
-            }
-            // Message and title are in the root unlike all the others.
-            listOf("message", "title").forEach { key ->
-                if (it.containsKey(key)) {
-                    flattened[key] = it[key].toString()
-                }
-            }
-            serverManager.getServer(serverId)?.let { server ->
-                flattened["webhook_id"] = server.connection.webhookId.toString()
-            }
-            messagingManager.handleMessage(flattened, SOURCE)
+        val lease = websocketNotificationManager.acquire(serverId) ?: return
+        try {
+            awaitCancellation()
+        } finally {
+            lease.close()
         }
     }
 

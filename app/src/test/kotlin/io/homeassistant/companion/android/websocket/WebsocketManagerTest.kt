@@ -16,7 +16,6 @@ import io.homeassistant.companion.android.database.settings.SensorUpdateFrequenc
 import io.homeassistant.companion.android.database.settings.Setting
 import io.homeassistant.companion.android.database.settings.SettingsDao
 import io.homeassistant.companion.android.database.settings.WebsocketSetting
-import io.homeassistant.companion.android.notifications.MessagingManager
 import io.homeassistant.companion.android.util.hasActiveConnection
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -48,7 +47,7 @@ class WebsocketManagerTest {
 
     private val entryPoint = object : WebsocketManager.WebsocketManagerEntryPoint {
         val dao = mockk<SettingsDao>()
-        val messagingManager = mockk<MessagingManager>()
+        val websocketNotificationManager = mockk<WebsocketNotificationManager>()
         val serverManager = mockk<ServerManager>(relaxed = true).apply {
             coEvery { servers() } returns listOf(mockk<Server>(relaxed = true))
             // Test does not cover websocket monitoring right now, failsafe to end quickly if it tries
@@ -59,7 +58,7 @@ class WebsocketManagerTest {
         }
 
         override fun serverManager(): ServerManager = serverManager
-        override fun messagingManager(): MessagingManager = messagingManager
+        override fun websocketNotificationManager(): WebsocketNotificationManager = websocketNotificationManager
         override fun settingsDao(): SettingsDao = dao
         override fun checkLocalNetworkPermission(): CheckLocalNetworkPermissionUseCase = checkLocalNetworkPermission
     }
