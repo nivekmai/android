@@ -57,6 +57,9 @@ import okhttp3.WebSocketListener
 
 private val matterTimeout = 2.minutes
 
+private const val PHONE_ASSIST_TOOLS_DOMAIN = "phone_assist_tools"
+private const val PHONE_ASSIST_TOOLS_ACKNOWLEDGE_SERVICE = "acknowledge"
+
 class WebSocketRepositoryImpl internal constructor(
     private val webSocketCore: WebSocketCore,
     private val serverManager: ServerManager,
@@ -78,6 +81,22 @@ class WebSocketRepositoryImpl internal constructor(
             ),
         )
         return socketResponse is PongSocketResponse
+    }
+
+    override suspend fun acknowledgePhoneTool(requestId: String, success: Boolean, error: String?): Boolean {
+        val response = webSocketCore.sendMessage(
+            mapOf(
+                "type" to "call_service",
+                "domain" to PHONE_ASSIST_TOOLS_DOMAIN,
+                "service" to PHONE_ASSIST_TOOLS_ACKNOWLEDGE_SERVICE,
+                "service_data" to mapOf(
+                    "request_id" to requestId,
+                    "success" to success,
+                    "error" to error,
+                ).filterValues { it != null },
+            ),
+        )
+        return response?.success == true
     }
 
     override suspend fun getConfig(): GetConfigResponse? {
