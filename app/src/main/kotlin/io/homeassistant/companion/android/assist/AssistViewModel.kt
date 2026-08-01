@@ -21,6 +21,7 @@ import io.homeassistant.companion.android.common.assist.AssistViewModelBase
 import io.homeassistant.companion.android.common.data.servers.ServerManager
 import io.homeassistant.companion.android.common.data.websocket.impl.entities.AssistPipelineResponse
 import io.homeassistant.companion.android.common.util.AudioUrlPlayer
+import io.homeassistant.companion.android.websocket.WebsocketNotificationManager
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -37,6 +38,7 @@ class AssistViewModel @AssistedInject constructor(
     @Assisted initialAudioStrategy: AssistAudioStrategy,
     audioUrlPlayer: AudioUrlPlayer,
     application: Application,
+    private val websocketNotificationManager: WebsocketNotificationManager,
 ) : AssistViewModelBase(serverManager, initialAudioStrategy, audioUrlPlayer, application) {
 
     @AssistedFactory
@@ -90,6 +92,8 @@ class AssistViewModel @AssistedInject constructor(
 
     private var startedFromWakeWord = false
     private var inactivityTimerJob: Job? = null
+    private var websocketNotificationLease: WebsocketNotificationManager.Lease? = null
+    private var websocketNotificationServerId: Int? = null
 
     fun onCreate(
         hasPermission: Boolean,
@@ -116,6 +120,8 @@ class AssistViewModel @AssistedInject constructor(
                 )
                 return@launch
             }
+
+            acquireWebsocketNotifications(selectedServerId)
 
             if (
                 pipelineId == PIPELINE_LAST_USED &&
@@ -294,7 +300,20 @@ class AssistViewModel @AssistedInject constructor(
         stopPlayback()
 
         selectedServerId = serverId
+        acquireWebsocketNotifications(serverId)
         setPipeline(id)
+    }
+
+    private suspend fun acquireWebsocketNotifications(serverId: Int) {
+        if (websocketNotificationLease != null && websocketNotificationServerId == serverId) return
+
+        val newLease = websocketNotificationManager.acquire(serverId)
+        websocketNotificationLease?.close()
+        websocketNotificationLease = newLease
+        websocketNotificationServerId = serverId.takeIf { newLease != null }
+        if (newLease == null) {
+            Timber.w("Unable to listen for local-push notifications during Assist")
+        }
     }
 
     private suspend fun setPipeline(id: String?) {
@@ -517,5 +536,12 @@ class AssistViewModel @AssistedInject constructor(
         inactivityTimerJob?.cancel()
         stopRecording()
         stopPlayback()
+    }
+
+    override fun onCleared() {
+        websocketNotificationLease?.close()
+        websocketNotificationLease = null
+        websocketNotificationServerId = null
+        super.onCleared()
     }
 }
