@@ -10,14 +10,12 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.testing.HiltTestApplication
 import io.homeassistant.companion.android.common.data.servers.ServerManager
-import io.homeassistant.companion.android.common.data.websocket.WebSocketRepository
 import io.homeassistant.companion.android.common.util.CheckLocalNetworkPermissionUseCase
 import io.homeassistant.companion.android.database.server.Server
 import io.homeassistant.companion.android.database.settings.SensorUpdateFrequencySetting
 import io.homeassistant.companion.android.database.settings.Setting
 import io.homeassistant.companion.android.database.settings.SettingsDao
 import io.homeassistant.companion.android.database.settings.WebsocketSetting
-import io.homeassistant.companion.android.notifications.MessagingManager
 import io.homeassistant.companion.android.util.hasActiveConnection
 import io.mockk.coEvery
 import io.mockk.coJustRun
@@ -31,8 +29,8 @@ import io.mockk.unmockkAll
 import io.mockk.verify
 import junit.framework.TestCase.assertEquals
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -45,6 +43,7 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(application = HiltTestApplication::class)
+@OptIn(ExperimentalCoroutinesApi::class)
 class WebsocketManagerTest {
 
     private val powerManager = mockk<PowerManager>()
@@ -56,7 +55,7 @@ class WebsocketManagerTest {
 
     private val entryPoint = object : WebsocketManager.WebsocketManagerEntryPoint {
         val dao = mockk<SettingsDao>()
-        val messagingManager = mockk<MessagingManager>()
+        val websocketNotificationManager = mockk<WebsocketNotificationManager>()
         val serverManager = mockk<ServerManager>(relaxed = true).apply {
             coEvery { servers() } returns listOf(mockk<Server>(relaxed = true))
             // Test does not cover websocket monitoring right now, failsafe to end quickly if it tries
@@ -67,7 +66,7 @@ class WebsocketManagerTest {
         }
 
         override fun serverManager(): ServerManager = serverManager
-        override fun messagingManager(): MessagingManager = messagingManager
+        override fun websocketNotificationManager(): WebsocketNotificationManager = websocketNotificationManager
         override fun settingsDao(): SettingsDao = dao
         override fun checkLocalNetworkPermission(): CheckLocalNetworkPermissionUseCase = checkLocalNetworkPermission
     }
@@ -228,7 +227,7 @@ class WebsocketManagerTest {
     }
 
     @Test
-    fun `Given a collector that stopped when listening for notifications then it is restarted on the next interval`() = runTest {
+    fun `Given notification lease acquisition stops when listening then it is restarted on the next interval`() = runTest {
         mockSetting(WebsocketSetting.ALWAYS)
         every { context.hasActiveConnection() } returns true
         coEvery { entryPoint.serverManager.isRegistered() } returns true
@@ -236,12 +235,10 @@ class WebsocketManagerTest {
         mockkConstructor(NotificationCompat.Builder::class)
         every { anyConstructed<NotificationCompat.Builder>().build() } returns mockk<Notification>()
 
-        val repository = mockk<WebSocketRepository>(relaxed = true)
-        coEvery { entryPoint.serverManager.webSocketRepository(any()) } returns repository
-        // The first collection completes immediately (the initial subscribe failed, e.g. the
-        // server was still starting), the second stays live
-        coEvery { repository.getNotifications() } returnsMany
-            listOf(null, MutableSharedFlow<Map<String, Any>>())
+        val lease = mockk<WebsocketNotificationManager.Lease>(relaxed = true)
+        // The first acquisition fails, for example while the server is still starting.
+        // The second stays active until the worker is cancelled.
+        coEvery { entryPoint.websocketNotificationManager.acquire(any()) } returnsMany listOf(null, lease)
 
         val worker = spyk(TestListenableWorkerBuilder<WebsocketManager>(context).build())
         coJustRun { worker.setForeground(any()) }
@@ -249,12 +246,12 @@ class WebsocketManagerTest {
 
         val work = launch { worker.doWork() }
         testScheduler.runCurrent()
-        coVerify(exactly = 1) { repository.getNotifications() }
+        coVerify(exactly = 1) { entryPoint.websocketNotificationManager.acquire(any()) }
 
         // The next supervision interval restarts the stopped collector
         testScheduler.advanceTimeBy(31_000)
         testScheduler.runCurrent()
-        coVerify(exactly = 2) { repository.getNotifications() }
+        coVerify(exactly = 2) { entryPoint.websocketNotificationManager.acquire(any()) }
 
         work.cancelAndJoin()
     }

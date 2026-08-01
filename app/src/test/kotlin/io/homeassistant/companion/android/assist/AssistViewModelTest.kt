@@ -3,6 +3,7 @@ package io.homeassistant.companion.android.assist
 import android.app.Application
 import android.content.pm.PackageManager
 import io.homeassistant.companion.android.common.assist.AssistAudioStrategy
+import io.homeassistant.companion.android.common.assist.AssistViewModelBase
 import io.homeassistant.companion.android.common.data.integration.IntegrationRepository
 import io.homeassistant.companion.android.common.data.servers.ServerConnectionStateProvider
 import io.homeassistant.companion.android.common.data.servers.ServerManager
@@ -22,10 +23,13 @@ import io.homeassistant.companion.android.common.data.websocket.impl.entities.Tt
 import io.homeassistant.companion.android.common.util.AudioUrlPlayer
 import io.homeassistant.companion.android.common.util.PlaybackState
 import io.homeassistant.companion.android.testing.unit.MainDispatcherJUnit5Extension
+import io.homeassistant.companion.android.websocket.WebsocketNotificationManager
 import io.mockk.coEvery
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.unmockkAll
+import io.mockk.verify
 import java.net.URL
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -55,6 +59,7 @@ class AssistViewModelTest {
     private val application: Application = mockk(relaxed = true)
     private val webSocketRepository: WebSocketRepository = mockk(relaxed = true)
     private val integrationRepository: IntegrationRepository = mockk(relaxed = true)
+    private val websocketNotificationManager: WebsocketNotificationManager = mockk(relaxed = true)
 
     private lateinit var viewModel: AssistViewModel
 
@@ -106,6 +111,7 @@ class AssistViewModelTest {
             serverManager = serverManager,
             audioUrlPlayer = audioUrlPlayer,
             application = application,
+            websocketNotificationManager = websocketNotificationManager,
             initialAudioStrategy = object : AssistAudioStrategy {
                 override suspend fun audioData(): Flow<ShortArray> = emptyFlow()
 
@@ -137,6 +143,54 @@ class AssistViewModelTest {
     @AfterEach
     fun tearDown() {
         unmockkAll()
+    }
+
+    @Test
+    fun `Given proactive voice Assist when created then local-push subscription is acquired before voice pipeline starts`() = runTest {
+        coEvery { integrationRepository.getLastUsedPipelineSttSupport() } returns true
+        coEvery {
+            webSocketRepository.runAssistPipelineForVoice(
+                any(),
+                any(),
+                anyNullable(),
+                anyNullable(),
+                anyNullable(),
+            )
+        } returns flow { awaitCancellation() }
+
+        viewModel = createViewModel()
+        viewModel.onCreate(
+            hasPermission = true,
+            serverId = null,
+            pipelineId = AssistViewModelBase.PIPELINE_LAST_USED,
+            startListening = true,
+            wakeWordPhrase = null,
+        )
+        runCurrent()
+
+        coVerifyOrder {
+            websocketNotificationManager.acquire(ServerManager.SERVER_ID_ACTIVE)
+            webSocketRepository.runAssistPipelineForVoice(
+                any(),
+                any(),
+                anyNullable(),
+                anyNullable(),
+                anyNullable(),
+            )
+        }
+    }
+
+    @Test
+    fun `Given an active local-push lease when activity is destroyed then retained ViewModel keeps the lease`() = runTest {
+        val lease = mockk<WebsocketNotificationManager.Lease>(relaxed = true)
+        coEvery { websocketNotificationManager.acquire(any()) } returns lease
+
+        viewModel = createAndInitialize()
+        runCurrent()
+        viewModel.onDestroy()
+        runCurrent()
+
+        verify(exactly = 0) { lease.close() }
     }
 
     @Nested

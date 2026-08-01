@@ -2,6 +2,8 @@
 <changelog xmlns:tools="http://schemas.android.com/tools"
     tools:ignore="MissingDefaultResource">
     <release version="2026.8.1 - Main" versioncode="3">
+        <change>Debug prototype uses the established ACTION_ASSIST activity path for system assistant launches</change>
+        <change>Assist alarm and timer tools now open a temporary local-push channel while Assist is active</change>
         <change>Android 17: added assistant volume level sensor + notification command for control</change>
         <change>Health Connect sleep duration sensor now ignores awake and out of bed time</change>
         <change>Modernized settings for entity widgets and tiles</change>
