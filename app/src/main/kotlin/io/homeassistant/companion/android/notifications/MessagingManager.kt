@@ -189,8 +189,8 @@ class MessagingManager @Inject constructor(
         const val COMMAND_BLUETOOTH = "command_bluetooth"
         const val COMMAND_SCREEN_ON = "command_screen_on"
         const val COMMAND_MEDIA = "command_media"
-        const val COMMAND_ALARM = "command_alarm"
-        const val COMMAND_TIMER = "command_timer"
+        const val COMMAND_ALARM = DeviceCommandData.COMMAND_ALARM
+        const val COMMAND_TIMER = DeviceCommandData.COMMAND_TIMER
         const val COMMAND_HIGH_ACCURACY_MODE = "command_high_accuracy_mode"
         const val COMMAND_ACTIVITY = "command_activity"
         const val COMMAND_WEBVIEW = "command_webview"
@@ -241,6 +241,7 @@ class MessagingManager @Inject constructor(
 
         // Phone tool command parameters
         const val PHONE_TOOL_REQUEST_ID = "phone_tool_request_id"
+        const val HASS_COMMAND_ID = "hass_command_id"
 
         // App-lock command parameters:
         const val APP_LOCK_ENABLED = "app_lock_enabled"
@@ -278,6 +279,7 @@ class MessagingManager @Inject constructor(
             COMMAND_FLASHLIGHT,
             COMMAND_WAKE_WORD_DETECTION,
         )
+        val CLOCK_COMMANDS = setOf(COMMAND_ALARM, COMMAND_TIMER)
         val DND_COMMANDS = listOf(DND_ALARMS_ONLY, DND_ALL, DND_NONE, DND_PRIORITY_ONLY)
         val RM_COMMANDS = listOf(RM_NORMAL, RM_SILENT, RM_VIBRATE)
         val CHANNEL_VOLUME_STREAM = listOf(
@@ -405,6 +407,13 @@ class MessagingManager @Inject constructor(
                 }
 
                 jsonData[NotificationData.MESSAGE] == TextToSpeechData.COMMAND_STOP_TTS -> textToSpeechClient.stopTTS()
+                jsonData[NotificationData.MESSAGE] in CLOCK_COMMANDS && !allowCommands -> {
+                    completeClockCommand(
+                        data = jsonData,
+                        serverId = webhookServerId.toString(),
+                        result = ClockCommandResult.Failure("Device commands from this server are disabled"),
+                    )
+                }
                 jsonData[NotificationData.MESSAGE] in DEVICE_COMMANDS && allowCommands -> {
                     Timber.d("Processing device command")
                     when (jsonData[NotificationData.MESSAGE]) {
@@ -873,31 +882,9 @@ class MessagingManager @Inject constructor(
                 }
             }
 
-            COMMAND_ALARM -> {
-                val alarm = data.toAlarmCommand()
-                if (alarm == null) {
-                    handleInvalidClockCommand(data, serverId, "Invalid alarm command")
-                } else {
-                    completeClockCommand(
-                        data = data,
-                        serverId = serverId,
-                        result = clockCommandManager.setAlarm(alarm),
-                    )
-                }
-            }
+            COMMAND_ALARM -> handleAlarmCommand(data, serverId)
 
-            COMMAND_TIMER -> {
-                val timer = data.toTimerCommand()
-                if (timer == null) {
-                    handleInvalidClockCommand(data, serverId, "Invalid timer command")
-                } else {
-                    completeClockCommand(
-                        data = data,
-                        serverId = serverId,
-                        result = clockCommandManager.setTimer(timer),
-                    )
-                }
-            }
+            COMMAND_TIMER -> handleTimerCommand(data, serverId)
 
             COMMAND_LAUNCH_APP -> {
                 if (!Settings.canDrawOverlays(context)) {
@@ -963,6 +950,34 @@ class MessagingManager @Inject constructor(
         }
     }
 
+    private suspend fun handleAlarmCommand(data: Map<String, String>, serverId: String) {
+        if (!assistConfigManager.isAlarmControlEnabled()) {
+            completeClockCommand(data, serverId, ClockCommandResult.Failure("Alarm control is disabled"))
+            return
+        }
+        val alarm = data.toAlarmCommand()
+        if (alarm == null) {
+            handleInvalidClockCommand(data, serverId, "Invalid alarm command")
+            return
+        }
+        val request = data.toClockCommandRequest(serverId.toInt())
+        completeClockCommand(data, serverId, clockCommandManager.setAlarm(alarm, request))
+    }
+
+    private suspend fun handleTimerCommand(data: Map<String, String>, serverId: String) {
+        if (!assistConfigManager.isTimerControlEnabled()) {
+            completeClockCommand(data, serverId, ClockCommandResult.Failure("Timer control is disabled"))
+            return
+        }
+        val timer = data.toTimerCommand()
+        if (timer == null) {
+            handleInvalidClockCommand(data, serverId, "Invalid timer command")
+            return
+        }
+        val request = data.toClockCommandRequest(serverId.toInt())
+        completeClockCommand(data, serverId, clockCommandManager.setTimer(timer, request))
+    }
+
     private suspend fun handleInvalidClockCommand(data: Map<String, String>, serverId: String, error: String) {
         Timber.d("$error received")
         completeClockCommand(
@@ -973,8 +988,8 @@ class MessagingManager @Inject constructor(
     }
 
     private suspend fun completeClockCommand(data: Map<String, String>, serverId: String, result: ClockCommandResult) {
-        val requestId = data[PHONE_TOOL_REQUEST_ID]?.takeIf(String::isNotBlank)
-        if (requestId == null) {
+        val request = data.toClockCommandRequest(serverId.toInt())
+        if (request == null) {
             if (result is ClockCommandResult.Failure) {
                 sendNotification(data)
             }
@@ -982,18 +997,17 @@ class MessagingManager @Inject constructor(
         }
 
         val acknowledged = try {
-            when (result) {
-                ClockCommandResult.Success -> serverManager.webSocketRepository(serverId.toInt()).acknowledgePhoneTool(
-                    requestId = requestId,
-                    success = true,
+            val repository = serverManager.webSocketRepository(request.serverId)
+            when (request.protocol) {
+                ClockCommandProtocol.Core -> repository.acknowledgeDeviceCommand(
+                    commandId = request.requestId,
+                    success = result is ClockCommandResult.Success,
                 )
-
-                is ClockCommandResult.Failure -> serverManager.webSocketRepository(serverId.toInt())
-                    .acknowledgePhoneTool(
-                        requestId = requestId,
-                        success = false,
-                        error = result.error,
-                    )
+                ClockCommandProtocol.Legacy -> repository.acknowledgePhoneTool(
+                    requestId = request.requestId,
+                    success = result is ClockCommandResult.Success,
+                    error = (result as? ClockCommandResult.Failure)?.error,
+                )
             }
         } catch (e: CancellationException) {
             throw e
@@ -1002,7 +1016,7 @@ class MessagingManager @Inject constructor(
             false
         }
         if (!acknowledged) {
-            Timber.e("Server did not acknowledge phone tool result")
+            Timber.e("Server did not acknowledge clock command result")
         }
     }
 

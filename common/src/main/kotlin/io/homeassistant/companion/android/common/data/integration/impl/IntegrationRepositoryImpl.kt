@@ -34,6 +34,7 @@ import io.homeassistant.companion.android.common.data.integration.impl.entities.
 import io.homeassistant.companion.android.common.data.integration.impl.entities.UpdateLocationIntegrationRequest
 import io.homeassistant.companion.android.common.data.integration.impl.entities.UpdateLocationRequest
 import io.homeassistant.companion.android.common.data.integration.impl.entities.UpdateSensorStatesIntegrationRequest
+import io.homeassistant.companion.android.common.data.prefs.PrefsRepository
 import io.homeassistant.companion.android.common.data.servers.ServerManager
 import io.homeassistant.companion.android.common.data.servers.firstUrlOrNull
 import io.homeassistant.companion.android.common.data.servers.tryOnUrls
@@ -42,6 +43,7 @@ import io.homeassistant.companion.android.common.data.websocket.impl.entities.As
 import io.homeassistant.companion.android.common.data.websocket.impl.entities.AssistPipelineEventType
 import io.homeassistant.companion.android.common.data.websocket.impl.entities.AssistPipelineIntentEnd
 import io.homeassistant.companion.android.common.data.websocket.impl.entities.GetConfigResponse
+import io.homeassistant.companion.android.common.notifications.DeviceCommandData
 import io.homeassistant.companion.android.common.util.AppVersion
 import io.homeassistant.companion.android.common.util.MessagingToken
 import io.homeassistant.companion.android.common.util.isNullOrBlank
@@ -57,6 +59,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import okhttp3.HttpUrl
@@ -77,12 +81,14 @@ class IntegrationRepositoryImpl @AssistedInject constructor(
     @NamedModel private val model: String,
     @NamedOsVersion private val osVersion: String,
     @NamedDeviceId private val deviceId: String,
+    private val prefsRepository: PrefsRepository,
 ) : IntegrationRepository {
 
     companion object {
         private const val APP_ID = "io.homeassistant.companion.android"
         private const val APP_NAME = "Home Assistant"
         private const val OS_NAME = "Android"
+        private const val APP_DATA_SUPPORTED_DEVICE_COMMANDS = "supported_device_commands"
 
         // Note: _not_ server-specific
         private const val PREF_APP_VERSION = "app_version"
@@ -115,6 +121,7 @@ class IntegrationRepositoryImpl @AssistedInject constructor(
 
     private suspend fun connectionStateProvider() = serverManager.connectionStateProvider(serverId)
 
+    private val registrationUpdateMutex = Mutex()
     private var appActive = false
 
     override suspend fun registerDevice(deviceRegistration: DeviceRegistration) {
@@ -158,31 +165,32 @@ class IntegrationRepositoryImpl @AssistedInject constructor(
         }
     }
 
-    override suspend fun updateRegistration(deviceRegistration: DeviceRegistration, allowReregistration: Boolean) {
-        val request = RegisterDeviceIntegrationRequest(createUpdateRegistrationRequest(deviceRegistration))
-        callWebhookOnUrls(
-            request,
-            onSuccess = { response ->
-                // The server should return a body with the registration, but might return:
-                // 200 with empty body for broken direct webhook
-                // 404 for broken cloudhook
-                // 410 for missing config entry
-                if (response.code() == 200 && response.body()?.contentLength() == 0L) {
-                    Timber.w("update_registration returned empty body")
-                    maybeReregisterDeviceOnFailedUpdate(deviceRegistration, allowReregistration)
-                } else if (response.code() == 404 || response.code() == 410) {
-                    Timber.w("update_registration returned HTTP ${response.code()}")
-                    maybeReregisterDeviceOnFailedUpdate(deviceRegistration, allowReregistration)
-                } else {
-                    persistDeviceRegistration(deviceRegistration)
-                }
-            },
-            isValidResponse = { response ->
-                // when registration was successful or encountered an expected error
-                response.isSuccessful || response.code() == 404 || response.code() == 410
-            },
-        )
-    }
+    override suspend fun updateRegistration(deviceRegistration: DeviceRegistration, allowReregistration: Boolean) =
+        registrationUpdateMutex.withLock {
+            val request = RegisterDeviceIntegrationRequest(createUpdateRegistrationRequest(deviceRegistration))
+            callWebhookOnUrls(
+                request,
+                onSuccess = { response ->
+                    // The server should return a body with the registration, but might return:
+                    // 200 with empty body for broken direct webhook
+                    // 404 for broken cloudhook
+                    // 410 for missing config entry
+                    if (response.code() == 200 && response.body()?.contentLength() == 0L) {
+                        Timber.w("update_registration returned empty body")
+                        maybeReregisterDeviceOnFailedUpdate(deviceRegistration, allowReregistration)
+                    } else if (response.code() == 404 || response.code() == 410) {
+                        Timber.w("update_registration returned HTTP ${response.code()}")
+                        maybeReregisterDeviceOnFailedUpdate(deviceRegistration, allowReregistration)
+                    } else {
+                        persistDeviceRegistration(deviceRegistration)
+                    }
+                },
+                isValidResponse = { response ->
+                    // when registration was successful or encountered an expected error
+                    response.isSuccessful || response.code() == 404 || response.code() == 410
+                },
+            )
+        }
 
     private suspend fun maybeReregisterDeviceOnFailedUpdate(
         deviceRegistration: DeviceRegistration,
@@ -691,6 +699,12 @@ class IntegrationRepositoryImpl @AssistedInject constructor(
         val pushToken = deviceRegistration.pushToken ?: oldDeviceRegistration.pushToken
 
         val appData = mutableMapOf<String, Any>("push_websocket_channel" to deviceRegistration.pushWebsocket)
+        appData[APP_DATA_SUPPORTED_DEVICE_COMMANDS] = buildList {
+            if (isTrusted()) {
+                if (prefsRepository.isAssistAlarmControlEnabled()) add(DeviceCommandData.COMMAND_ALARM)
+                if (prefsRepository.isAssistTimerControlEnabled()) add(DeviceCommandData.COMMAND_TIMER)
+            }
+        }
         if (!pushToken.isNullOrBlank()) {
             appData["push_url"] = PUSH_URL
             appData["push_token"] = pushToken

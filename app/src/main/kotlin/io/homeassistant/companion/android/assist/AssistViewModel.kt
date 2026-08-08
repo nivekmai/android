@@ -121,8 +121,6 @@ class AssistViewModel @AssistedInject constructor(
                 return@launch
             }
 
-            acquireWebsocketNotifications(selectedServerId)
-
             if (
                 pipelineId == PIPELINE_LAST_USED &&
                 recorderAutoStart &&
@@ -135,6 +133,8 @@ class AssistViewModel @AssistedInject constructor(
                 pendingWakeWordConfirmation = wakeWordPhrase != null
                 onMicrophoneInput(proactive = true)
             }
+
+            acquireWebsocketNotifications(selectedServerId)
 
             val supported = checkSupport()
             if (supported != true) stopRecording()

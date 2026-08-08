@@ -6,9 +6,14 @@ import android.content.Intent
 import android.provider.AlarmClock
 import androidx.test.core.app.ApplicationProvider
 import dagger.hilt.android.testing.HiltTestApplication
+import io.homeassistant.companion.android.testing.unit.FakeClock
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ExperimentalTime
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -21,6 +26,7 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(application = HiltTestApplication::class)
+@OptIn(ExperimentalTime::class)
 class ClockCommandManagerTest {
     @Test
     fun `Given valid alarm data when parsing then return alarm command`() {
@@ -78,7 +84,7 @@ class ClockCommandManagerTest {
     }
 
     @Test
-    fun `Given alarm command when setting alarm then start clock activity with parameters`() {
+    fun `Given alarm command when setting alarm then start clock activity with parameters`() = runTest {
         val context = ApplicationProvider.getApplicationContext<HiltTestApplication>()
         val manager = ClockCommandManager(context)
 
@@ -102,7 +108,7 @@ class ClockCommandManagerTest {
     }
 
     @Test
-    fun `Given alarm without message when setting alarm then omit message parameter`() {
+    fun `Given alarm without message when setting alarm then omit message parameter`() = runTest {
         val context = ApplicationProvider.getApplicationContext<HiltTestApplication>()
         val manager = ClockCommandManager(context)
 
@@ -171,7 +177,7 @@ class ClockCommandManagerTest {
     }
 
     @Test
-    fun `Given timer command when setting timer then start clock activity with parameters`() {
+    fun `Given timer command when setting timer then start clock activity with parameters`() = runTest {
         val context = ApplicationProvider.getApplicationContext<HiltTestApplication>()
         val manager = ClockCommandManager(context)
 
@@ -193,7 +199,7 @@ class ClockCommandManagerTest {
     }
 
     @Test
-    fun `Given timer without message when setting timer then omit message parameter`() {
+    fun `Given timer without message when setting timer then omit message parameter`() = runTest {
         val context = ApplicationProvider.getApplicationContext<HiltTestApplication>()
         val manager = ClockCommandManager(context)
 
@@ -211,7 +217,7 @@ class ClockCommandManagerTest {
     }
 
     @Test
-    fun `Given no compatible clock app when setting timer then return failure`() {
+    fun `Given no compatible clock app when setting timer then return failure`() = runTest {
         val context = mockk<Context>()
         every { context.startActivity(any()) } throws ActivityNotFoundException()
         val manager = ClockCommandManager(context)
@@ -225,5 +231,68 @@ class ClockCommandManagerTest {
         )
 
         assertEquals(ClockCommandResult.Failure("No compatible clock app is installed"), result)
+    }
+
+    @Test
+    fun `Given duplicate request when setting alarm then launch once and return cached result`() = runTest {
+        val context = mockk<Context>(relaxed = true)
+        val manager = ClockCommandManager(context, FakeClock())
+        val alarm = AlarmCommand(hour = 7, minute = 30, message = null, skipUi = true)
+        val request = ClockCommandRequest(1, "request-1", ClockCommandProtocol.Core)
+
+        val firstResult = manager.setAlarm(alarm, request)
+        val duplicateResult = manager.setAlarm(alarm, request)
+
+        assertEquals(ClockCommandResult.Success, firstResult)
+        assertEquals(firstResult, duplicateResult)
+        verify(exactly = 1) { context.startActivity(any()) }
+    }
+
+    @Test
+    fun `Given cached request expired when setting alarm then launch again`() = runTest {
+        val context = mockk<Context>(relaxed = true)
+        val clock = FakeClock()
+        val manager = ClockCommandManager(context, clock)
+        val alarm = AlarmCommand(hour = 7, minute = 30, message = null, skipUi = true)
+        val request = ClockCommandRequest(1, "request-1", ClockCommandProtocol.Core)
+
+        manager.setAlarm(alarm, request)
+        clock.currentInstant += 11.minutes
+        manager.setAlarm(alarm, request)
+
+        verify(exactly = 2) { context.startActivity(any()) }
+    }
+
+    @Test
+    fun `Given cache reaches its bound when oldest request repeats then launch it again`() = runTest {
+        val context = mockk<Context>(relaxed = true)
+        val manager = ClockCommandManager(context, FakeClock())
+        val timer = TimerCommand(duration = 1.seconds, message = null, skipUi = true)
+
+        repeat(101) { index ->
+            manager.setTimer(timer, ClockCommandRequest(1, "request-$index", ClockCommandProtocol.Core))
+        }
+        manager.setTimer(timer, ClockCommandRequest(1, "request-0", ClockCommandProtocol.Core))
+
+        verify(exactly = 102) { context.startActivity(any()) }
+    }
+
+    @Test
+    fun `Given both request identifiers when parsing then prefer Core protocol`() {
+        val request = mapOf(
+            MessagingManager.HASS_COMMAND_ID to "core-request",
+            MessagingManager.PHONE_TOOL_REQUEST_ID to "legacy-request",
+        ).toClockCommandRequest(serverId = 7)
+
+        assertEquals(ClockCommandRequest(7, "core-request", ClockCommandProtocol.Core), request)
+    }
+
+    @Test
+    fun `Given legacy request identifier when parsing then use legacy protocol`() {
+        val request = mapOf(
+            MessagingManager.PHONE_TOOL_REQUEST_ID to "legacy-request",
+        ).toClockCommandRequest(serverId = 7)
+
+        assertEquals(ClockCommandRequest(7, "legacy-request", ClockCommandProtocol.Legacy), request)
     }
 }

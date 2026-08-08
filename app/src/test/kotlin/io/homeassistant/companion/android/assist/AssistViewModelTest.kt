@@ -25,13 +25,14 @@ import io.homeassistant.companion.android.common.util.PlaybackState
 import io.homeassistant.companion.android.testing.unit.MainDispatcherJUnit5Extension
 import io.homeassistant.companion.android.websocket.WebsocketNotificationManager
 import io.mockk.coEvery
-import io.mockk.coVerifyOrder
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.unmockkAll
 import io.mockk.verify
 import java.net.URL
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
@@ -106,25 +107,27 @@ class AssistViewModelTest {
         coEvery { serverManager.servers() } returns listOf()
     }
 
-    private fun createViewModel(): AssistViewModel {
+    private fun createViewModel(
+        audioStrategy: AssistAudioStrategy = object : AssistAudioStrategy {
+            override suspend fun audioData(): Flow<ShortArray> = emptyFlow()
+
+            override val wakeWordDetected: Flow<String> = emptyFlow()
+
+            override fun requestFocus() {
+                // No-op for testing
+            }
+
+            override fun abandonFocus() {
+                // No-op for testing
+            }
+        },
+    ): AssistViewModel {
         return AssistViewModel(
             serverManager = serverManager,
             audioUrlPlayer = audioUrlPlayer,
             application = application,
             websocketNotificationManager = websocketNotificationManager,
-            initialAudioStrategy = object : AssistAudioStrategy {
-                override suspend fun audioData(): Flow<ShortArray> = emptyFlow()
-
-                override val wakeWordDetected: Flow<String> = emptyFlow()
-
-                override fun requestFocus() {
-                    // No-op for testing
-                }
-
-                override fun abandonFocus() {
-                    // No-op for testing
-                }
-            },
+            initialAudioStrategy = audioStrategy,
         )
     }
 
@@ -146,7 +149,15 @@ class AssistViewModelTest {
     }
 
     @Test
-    fun `Given proactive voice Assist when created then local-push subscription is acquired before voice pipeline starts`() = runTest {
+    fun `Given local-push setup pending when proactive voice Assist created then audio starts before pipeline`() = runTest {
+        val audioStrategy = mockk<AssistAudioStrategy>(relaxed = true)
+        val localPushLease = CompletableDeferred<WebsocketNotificationManager.Lease?>()
+
+        every { audioStrategy.wakeWordDetected } returns emptyFlow()
+        coEvery { audioStrategy.audioData() } returns flow { awaitCancellation() }
+        coEvery { websocketNotificationManager.acquire(ServerManager.SERVER_ID_ACTIVE) } coAnswers {
+            localPushLease.await()
+        }
         coEvery { integrationRepository.getLastUsedPipelineSttSupport() } returns true
         coEvery {
             webSocketRepository.runAssistPipelineForVoice(
@@ -158,7 +169,7 @@ class AssistViewModelTest {
             )
         } returns flow { awaitCancellation() }
 
-        viewModel = createViewModel()
+        viewModel = createViewModel(audioStrategy)
         viewModel.onCreate(
             hasPermission = true,
             serverId = null,
@@ -168,8 +179,21 @@ class AssistViewModelTest {
         )
         runCurrent()
 
-        coVerifyOrder {
-            websocketNotificationManager.acquire(ServerManager.SERVER_ID_ACTIVE)
+        coVerify(exactly = 1) { audioStrategy.audioData() }
+        coVerify(exactly = 0) {
+            webSocketRepository.runAssistPipelineForVoice(
+                any(),
+                any(),
+                anyNullable(),
+                anyNullable(),
+                anyNullable(),
+            )
+        }
+
+        localPushLease.complete(mockk(relaxed = true))
+        runCurrent()
+
+        coVerify(exactly = 1) {
             webSocketRepository.runAssistPipelineForVoice(
                 any(),
                 any(),

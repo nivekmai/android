@@ -67,6 +67,9 @@ interface WebSocketRepository {
     suspend fun getNotifications(): Flow<Map<String, Any>>?
     suspend fun ackNotification(confirmId: String): Boolean
 
+    /** Report completion of a device command using the mobile app Core protocol. */
+    suspend fun acknowledgeDeviceCommand(commandId: String, success: Boolean): Boolean
+
     /**
      * Report completion of a phone Assist tool request to Home Assistant.
      * @return `true` when Home Assistant accepted the result.

@@ -234,6 +234,36 @@ class WebSocketRepositoryImplTest {
     }
 
     @Nested
+    inner class AcknowledgeDeviceCommand {
+
+        @Test
+        fun `Given command result when acknowledging then send Core mobile app result`() = runTest {
+            val messageSlot = slot<Map<String, Any?>>()
+            coEvery { webSocketCore.server() } returns createServer()
+            coEvery { webSocketCore.sendMessage(capture(messageSlot)) } returns MessageSocketResponse(
+                id = 1,
+                success = true,
+            )
+
+            val acknowledged = repository.acknowledgeDeviceCommand(
+                commandId = "command-123",
+                success = true,
+            )
+
+            assertTrue(acknowledged)
+            assertEquals(
+                mapOf(
+                    "type" to "mobile_app/command_result",
+                    "webhook_id" to "webhook_id",
+                    "hass_command_id" to "command-123",
+                    "success" to true,
+                ),
+                messageSlot.captured,
+            )
+        }
+    }
+
+    @Nested
     inner class AcknowledgePhoneTool {
 
         private fun captureSentMessage(responseSuccess: Boolean): CapturingSlot<Map<String, Any?>> {
@@ -357,6 +387,7 @@ class WebSocketRepositoryImplTest {
             deviceRegistryId = deviceRegistryId,
             connection = ServerConnectionInfo(
                 externalUrl = "https://example.com",
+                webhookId = "webhook_id",
             ),
             session = ServerSessionInfo(),
             user = ServerUserInfo(),

@@ -378,6 +378,20 @@ class WebSocketRepositoryImpl internal constructor(
         return response?.success == true
     }
 
+    override suspend fun acknowledgeDeviceCommand(commandId: String, success: Boolean): Boolean {
+        val response = webSocketCore.server()?.let {
+            webSocketCore.sendMessage(
+                mapOf(
+                    "type" to "mobile_app/command_result",
+                    "webhook_id" to it.connection.webhookId!!,
+                    "hass_command_id" to commandId,
+                    "success" to success,
+                ),
+            )
+        }
+        return response?.success == true
+    }
+
     override suspend fun commissionMatterDevice(code: String): MatterCommissionResponse? {
         val response = webSocketCore.sendMessage(
             WebSocketRequest(

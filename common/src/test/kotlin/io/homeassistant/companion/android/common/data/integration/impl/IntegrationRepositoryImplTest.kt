@@ -5,6 +5,9 @@ import io.homeassistant.companion.android.common.data.integration.DeviceRegistra
 import io.homeassistant.companion.android.common.data.integration.IntegrationException
 import io.homeassistant.companion.android.common.data.integration.IntegrationRepository
 import io.homeassistant.companion.android.common.data.integration.impl.IntegrationRepositoryImpl.Companion.PREF_ASK_NOTIFICATION_PERMISSION
+import io.homeassistant.companion.android.common.data.integration.impl.entities.IntegrationRequest
+import io.homeassistant.companion.android.common.data.integration.impl.entities.RegisterDeviceIntegrationRequest
+import io.homeassistant.companion.android.common.data.prefs.PrefsRepository
 import io.homeassistant.companion.android.common.data.servers.ServerConnectionStateProvider
 import io.homeassistant.companion.android.common.data.servers.ServerManager
 import io.homeassistant.companion.android.common.data.servers.UrlState
@@ -16,8 +19,13 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.spyk
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -35,6 +43,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import retrofit2.Response
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class IntegrationRepositoryImplTest {
 
     private val integrationService = mockk<IntegrationService>()
@@ -44,6 +53,7 @@ class IntegrationRepositoryImplTest {
     private val serverConnection = mockk<ServerConnectionInfo>()
     private val connectionStateProvider = mockk<ServerConnectionStateProvider>()
     private val localStorage = mockk<LocalStorage>()
+    private val prefsRepository = mockk<PrefsRepository>(relaxed = true)
 
     private lateinit var repository: IntegrationRepository
 
@@ -53,12 +63,23 @@ class IntegrationRepositoryImplTest {
         every { server.connection } returns serverConnection
         every { server.deviceName } returns "Device name"
         coEvery { serverManager.connectionStateProvider(serverID) } returns connectionStateProvider
+        coEvery { localStorage.getBooleanOrNull("${serverID}_trusted") } returns null
 
         val url = "http://homeassistant:8123".toHttpUrl()
         coEvery { connectionStateProvider.getApiUrls() } returns listOf(url)
         coEvery { connectionStateProvider.urlFlow(any()) } returns flowOf(UrlState.HasUrl(url.toUrl()))
 
-        repository = IntegrationRepositoryImpl(integrationService, serverManager, serverID, localStorage, "", "", "", "")
+        repository = IntegrationRepositoryImpl(
+            integrationService,
+            serverManager,
+            serverID,
+            localStorage,
+            "",
+            "",
+            "",
+            "",
+            prefsRepository,
+        )
     }
 
     @Test
@@ -169,6 +190,7 @@ class IntegrationRepositoryImplTest {
             "",
             "",
             "",
+            prefsRepository,
         )
 
         coEvery { localStorage.putBoolean(any(), any()) } returns Unit
@@ -182,6 +204,92 @@ class IntegrationRepositoryImplTest {
 
     @Nested
     inner class UpdateRegistrationTests {
+
+        @Test
+        fun `Given alarm and timer controls enabled when updating registration then advertise both commands`() = runTest {
+            val requestSlot = slot<IntegrationRequest>()
+            coEvery { integrationService.callWebhook(any(), capture(requestSlot)) } returns
+                Response.success("content".toResponseBody())
+            coEvery { localStorage.getString(any()) } returns null
+            coEvery { prefsRepository.isAssistAlarmControlEnabled() } returns true
+            coEvery { prefsRepository.isAssistTimerControlEnabled() } returns true
+
+            repository.updateRegistration(DeviceRegistration())
+
+            val request = requestSlot.captured as RegisterDeviceIntegrationRequest
+            assertEquals(
+                listOf("command_alarm", "command_timer"),
+                request.data.appData?.get("supported_device_commands"),
+            )
+        }
+
+        @Test
+        fun `Given phone controls disabled when updating registration then advertise an empty command list`() = runTest {
+            val requestSlot = slot<IntegrationRequest>()
+            coEvery { integrationService.callWebhook(any(), capture(requestSlot)) } returns
+                Response.success("content".toResponseBody())
+            coEvery { localStorage.getString(any()) } returns null
+            coEvery { prefsRepository.isAssistAlarmControlEnabled() } returns false
+            coEvery { prefsRepository.isAssistTimerControlEnabled() } returns false
+
+            repository.updateRegistration(DeviceRegistration())
+
+            val request = requestSlot.captured as RegisterDeviceIntegrationRequest
+            assertEquals(emptyList<String>(), request.data.appData?.get("supported_device_commands"))
+        }
+
+        @Test
+        fun `Given server is untrusted when updating registration then advertise no phone commands`() = runTest {
+            val requestSlot = slot<IntegrationRequest>()
+            coEvery { integrationService.callWebhook(any(), capture(requestSlot)) } returns
+                Response.success("content".toResponseBody())
+            coEvery { localStorage.getString(any()) } returns null
+            coEvery { localStorage.getBooleanOrNull("${serverID}_trusted") } returns false
+            coEvery { prefsRepository.isAssistAlarmControlEnabled() } returns true
+            coEvery { prefsRepository.isAssistTimerControlEnabled() } returns true
+
+            repository.updateRegistration(DeviceRegistration())
+
+            val request = requestSlot.captured as RegisterDeviceIntegrationRequest
+            assertEquals(emptyList<String>(), request.data.appData?.get("supported_device_commands"))
+        }
+
+        @Test
+        fun `Given concurrent registration updates when preferences change then publish requests in order`() = runTest {
+            val firstRequestStarted = CompletableDeferred<Unit>()
+            val releaseFirstRequest = CompletableDeferred<Unit>()
+            val requests = mutableListOf<RegisterDeviceIntegrationRequest>()
+            var alarmEnabled = false
+            coEvery { prefsRepository.isAssistAlarmControlEnabled() } coAnswers { alarmEnabled }
+            coEvery { prefsRepository.isAssistTimerControlEnabled() } returns false
+            coEvery { localStorage.getString(any()) } returns null
+            coEvery { integrationService.callWebhook(any(), any()) } coAnswers {
+                requests += secondArg<IntegrationRequest>() as RegisterDeviceIntegrationRequest
+                if (requests.size == 1) {
+                    firstRequestStarted.complete(Unit)
+                    releaseFirstRequest.await()
+                }
+                Response.success("content".toResponseBody())
+            }
+
+            val firstUpdate = async { repository.updateRegistration(DeviceRegistration()) }
+            firstRequestStarted.await()
+            alarmEnabled = true
+            val secondUpdate = async { repository.updateRegistration(DeviceRegistration()) }
+            runCurrent()
+
+            assertEquals(1, requests.size)
+            releaseFirstRequest.complete(Unit)
+            firstUpdate.await()
+            secondUpdate.await()
+            assertEquals(
+                listOf(
+                    emptyList<String>(),
+                    listOf("command_alarm"),
+                ),
+                requests.map { it.data.appData?.get("supported_device_commands") },
+            )
+        }
 
         @Test
         fun `Given success when updating registration then registration is persisted`() = runTest {
