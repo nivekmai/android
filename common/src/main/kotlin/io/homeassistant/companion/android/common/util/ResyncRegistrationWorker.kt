@@ -5,6 +5,7 @@ import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.Operation
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import dagger.hilt.EntryPoint
@@ -44,7 +45,7 @@ class ResyncRegistrationWorker(context: Context, params: WorkerParameters) :
             fun pushWebsocketSupport(): Boolean
         }
 
-        fun WorkManager.enqueueResyncRegistration() {
+        fun WorkManager.enqueueResyncRegistration(): Operation {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED).build()
 
@@ -52,7 +53,7 @@ class ResyncRegistrationWorker(context: Context, params: WorkerParameters) :
                 .setConstraints(constraints)
                 .build()
 
-            enqueue(worker)
+            return enqueue(worker)
         }
     }
 

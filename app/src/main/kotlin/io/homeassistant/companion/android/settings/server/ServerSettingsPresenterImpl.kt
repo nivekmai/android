@@ -1,8 +1,11 @@
 package io.homeassistant.companion.android.settings.server
 
+import androidx.concurrent.futures.await
 import androidx.preference.PreferenceDataStore
+import androidx.work.WorkManager
 import io.homeassistant.companion.android.common.data.network.WifiHelper
 import io.homeassistant.companion.android.common.data.servers.ServerManager
+import io.homeassistant.companion.android.common.util.ResyncRegistrationWorker.Companion.enqueueResyncRegistration
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,6 +18,7 @@ import timber.log.Timber
 class ServerSettingsPresenterImpl @Inject constructor(
     private val serverManager: ServerManager,
     private val wifiHelper: WifiHelper,
+    private val workManager: WorkManager,
 ) : PreferenceDataStore(),
     ServerSettingsPresenter {
 
@@ -41,7 +45,10 @@ class ServerSettingsPresenterImpl @Inject constructor(
     override fun putBoolean(key: String?, value: Boolean) {
         mainScope.launch {
             when (key) {
-                "trust_server" -> serverManager.integrationRepository(serverId).setTrusted(value)
+                "trust_server" -> {
+                    serverManager.integrationRepository(serverId).setTrusted(value)
+                    workManager.enqueueResyncRegistration().result.await()
+                }
                 "app_lock" -> serverManager.authenticationRepository(serverId).setLockEnabled(value)
                 "app_lock_home_bypass" -> serverManager.authenticationRepository(
                     serverId,

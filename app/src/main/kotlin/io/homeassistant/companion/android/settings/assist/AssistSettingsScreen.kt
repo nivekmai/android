@@ -139,6 +139,8 @@ fun AssistSettingsScreen(viewModel: AssistSettingsViewModel, modifier: Modifier 
                     viewModel.onToggleWakeWord(enabled)
                 }
             },
+            onToggleAlarmControl = viewModel::onToggleAlarmControl,
+            onToggleTimerControl = viewModel::onToggleTimerControl,
             onSelectWakeWord = viewModel::onSelectWakeWordModel,
             onStartTestWakeWord = { viewModel.setTestingWakeWord(true) },
             onStopTestWakeWord = { viewModel.setTestingWakeWord(false) },
@@ -154,6 +156,8 @@ internal fun AssistSettingsContent(
     hasAudioPermission: Boolean,
     onSetDefaultAssistant: () -> Unit,
     onToggleWakeWord: (Boolean) -> Unit,
+    onToggleAlarmControl: (Boolean) -> Unit = {},
+    onToggleTimerControl: (Boolean) -> Unit = {},
     onSelectWakeWord: (MicroWakeWordModelConfig) -> Unit,
     onStartTestWakeWord: () -> Unit,
     onStopTestWakeWord: () -> Unit,
@@ -181,6 +185,23 @@ internal fun AssistSettingsContent(
 
             Spacer(modifier = Modifier.height(HADimens.SPACE2))
 
+            SectionHeader(
+                text = stringResource(commonR.string.assist_phone_controls_title),
+                modifier = Modifier.padding(bottom = HADimens.SPACE1),
+            )
+            PhoneControlsCard(
+                alarmEnabled = uiState.isAlarmControlEnabled,
+                timerEnabled = uiState.isTimerControlEnabled,
+                onToggleAlarm = onToggleAlarmControl,
+                onToggleTimer = onToggleTimerControl,
+            )
+            HAHint(
+                text = stringResource(commonR.string.assist_phone_controls_summary),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Spacer(modifier = Modifier.height(HADimens.SPACE2))
+
             // Wake Word Section
             Row(
                 horizontalArrangement = Arrangement.spacedBy(HADimens.SPACE2),
@@ -200,6 +221,47 @@ internal fun AssistSettingsContent(
                 onStopTestWakeWord = onStopTestWakeWord,
             )
         }
+    }
+}
+
+@Composable
+private fun PhoneControlsCard(
+    alarmEnabled: Boolean,
+    timerEnabled: Boolean,
+    onToggleAlarm: (Boolean) -> Unit,
+    onToggleTimer: (Boolean) -> Unit,
+) {
+    HASettingsCard {
+        Column(verticalArrangement = Arrangement.spacedBy(HADimens.SPACE4)) {
+            PhoneControlToggleRow(
+                label = stringResource(commonR.string.assist_phone_controls_alarms),
+                enabled = alarmEnabled,
+                onToggle = onToggleAlarm,
+            )
+            PhoneControlToggleRow(
+                label = stringResource(commonR.string.assist_phone_controls_timers),
+                enabled = timerEnabled,
+                onToggle = onToggleTimer,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PhoneControlToggleRow(label: String, enabled: Boolean, onToggle: (Boolean) -> Unit) {
+    val colorScheme = LocalHAColorScheme.current
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(role = Role.Switch) { onToggle(!enabled) },
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = HATextStyle.Body,
+            color = colorScheme.colorTextPrimary,
+            modifier = Modifier.weight(1f),
+        )
+        HASwitch(checked = enabled, onCheckedChange = onToggle)
     }
 }
 

@@ -431,4 +431,24 @@ class PrefsRepositoryImplTest {
             coVerify { localStorage.putInt(key, currentVersionCode) }
         }
     }
+
+    @Test
+    fun `Given phone controls not configured when reading then both default to disabled`() = runTest {
+        coEvery { localStorage.getBooleanOrNull("assist_alarm_control_enabled") } returns null
+        coEvery { localStorage.getBooleanOrNull("assist_timer_control_enabled") } returns null
+
+        assertFalse(repository.isAssistAlarmControlEnabled())
+        assertFalse(repository.isAssistTimerControlEnabled())
+    }
+
+    @Test
+    fun `Given phone control settings when saving then persist each independently`() = runTest {
+        coEvery { localStorage.putBoolean(any(), any()) } returns Unit
+
+        repository.setAssistAlarmControlEnabled(true)
+        repository.setAssistTimerControlEnabled(false)
+
+        coVerify { localStorage.putBoolean("assist_alarm_control_enabled", true) }
+        coVerify { localStorage.putBoolean("assist_timer_control_enabled", false) }
+    }
 }

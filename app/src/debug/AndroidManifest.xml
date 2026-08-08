@@ -46,6 +46,21 @@
                     android:pathPrefix="/tag/" />
             </intent-filter>
         </activity>
+
+        <!--
+        This prototype uses the established ACTION_ASSIST activity integration. Removing the
+        VoiceInteractionService components from debug builds prevents Android from selecting the
+        newer session-based path, which currently fails to surface AssistActivity on some devices.
+        -->
+        <service
+            android:name=".assist.service.AssistVoiceInteractionService"
+            tools:node="remove" />
+        <service
+            android:name=".assist.service.AssistVoiceInteractionSessionService"
+            tools:node="remove" />
+        <service
+            android:name=".assist.service.AssistRecognitionService"
+            tools:node="remove" />
     </application>
 
 </manifest>

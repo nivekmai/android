@@ -45,6 +45,8 @@ private const val PREF_LAST_SEEN_CHANGELOG_VERSION = "last_seen_changelog_versio
 private const val PREF_SHOW_PRIVACY_HINT = "show_privacy_hint"
 private const val PREF_WAKE_WORD_ENABLED = "wake_word_enabled"
 private const val PREF_SELECTED_WAKE_WORD = "selected_wake_word"
+private const val PREF_ASSIST_ALARM_CONTROL_ENABLED = "assist_alarm_control_enabled"
+private const val PREF_ASSIST_TIMER_CONTROL_ENABLED = "assist_timer_control_enabled"
 private const val PREF_ALLOWED_TAGS = "allowed_tags"
 
 /**
@@ -442,6 +444,22 @@ internal class PrefsRepositoryImpl @Inject constructor(
 
     override suspend fun setSelectedWakeWord(wakeWord: String) {
         localStorage().putString(PREF_SELECTED_WAKE_WORD, wakeWord)
+    }
+
+    override suspend fun isAssistAlarmControlEnabled(): Boolean {
+        return localStorage().getBooleanOrNull(PREF_ASSIST_ALARM_CONTROL_ENABLED) ?: false
+    }
+
+    override suspend fun setAssistAlarmControlEnabled(enabled: Boolean) {
+        localStorage().putBoolean(PREF_ASSIST_ALARM_CONTROL_ENABLED, enabled)
+    }
+
+    override suspend fun isAssistTimerControlEnabled(): Boolean {
+        return localStorage().getBooleanOrNull(PREF_ASSIST_TIMER_CONTROL_ENABLED) ?: false
+    }
+
+    override suspend fun setAssistTimerControlEnabled(enabled: Boolean) {
+        localStorage().putBoolean(PREF_ASSIST_TIMER_CONTROL_ENABLED, enabled)
     }
 
     override suspend fun addAllowedTag(tag: String) {

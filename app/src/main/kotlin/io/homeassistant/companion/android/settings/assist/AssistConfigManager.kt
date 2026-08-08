@@ -3,13 +3,24 @@ package io.homeassistant.companion.android.settings.assist
 import android.Manifest
 import android.content.Context
 import androidx.annotation.RequiresPermission
+import androidx.concurrent.futures.await
+import androidx.work.WorkManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.homeassistant.companion.android.assist.service.AssistVoiceInteractionService
 import io.homeassistant.companion.android.assist.wakeword.MicroWakeWordModelConfig
+import io.homeassistant.companion.android.common.data.integration.DeviceRegistration
 import io.homeassistant.companion.android.common.data.prefs.PrefsRepository
+import io.homeassistant.companion.android.common.data.servers.ServerManager
 import io.homeassistant.companion.android.common.util.FailFast
+import io.homeassistant.companion.android.common.util.ResyncRegistrationWorker.Companion.enqueueResyncRegistration
 import io.homeassistant.companion.android.common.util.SuspendLazy
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import timber.log.Timber
 
 private const val DEFAULT_WAKE_WORD = "Okay Nabu"
 
@@ -51,14 +62,29 @@ interface AssistConfigManager {
      */
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     suspend fun setSelectedWakeWordModel(model: MicroWakeWordModelConfig)
+
+    /** Returns whether Assist may create alarms in this phone's Clock app. */
+    suspend fun isAlarmControlEnabled(): Boolean
+
+    /** Enables or disables creating alarms and updates every server registration. */
+    suspend fun setAlarmControlEnabled(enabled: Boolean)
+
+    /** Returns whether Assist may create timers in this phone's Clock app. */
+    suspend fun isTimerControlEnabled(): Boolean
+
+    /** Enables or disables creating timers and updates every server registration. */
+    suspend fun setTimerControlEnabled(enabled: Boolean)
 }
 
 class AssistConfigManagerImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val prefsRepository: PrefsRepository,
+    private val serverManager: ServerManager,
+    private val workManager: WorkManager,
 ) : AssistConfigManager {
 
     private val models = SuspendLazy { MicroWakeWordModelConfig.loadAvailableModels(context) }
+    private val phoneControlMutex = Mutex()
 
     override suspend fun getAvailableModels(): List<MicroWakeWordModelConfig> {
         return models.get()
@@ -99,6 +125,40 @@ class AssistConfigManagerImpl @Inject constructor(
 
         if (model.wakeWord != previousWakeWord && prefsRepository.isWakeWordEnabled()) {
             AssistVoiceInteractionService.startListening(context)
+        }
+    }
+
+    override suspend fun isAlarmControlEnabled(): Boolean = prefsRepository.isAssistAlarmControlEnabled()
+
+    override suspend fun setAlarmControlEnabled(enabled: Boolean) {
+        updatePhoneControlSettings {
+            prefsRepository.setAssistAlarmControlEnabled(enabled)
+        }
+    }
+
+    override suspend fun isTimerControlEnabled(): Boolean = prefsRepository.isAssistTimerControlEnabled()
+
+    override suspend fun setTimerControlEnabled(enabled: Boolean) {
+        updatePhoneControlSettings {
+            prefsRepository.setAssistTimerControlEnabled(enabled)
+        }
+    }
+
+    private suspend fun updatePhoneControlSettings(updatePreference: suspend () -> Unit) {
+        phoneControlMutex.withLock {
+            withContext(NonCancellable) {
+                updatePreference()
+                workManager.enqueueResyncRegistration().result.await()
+            }
+            serverManager.servers().forEach { server ->
+                try {
+                    serverManager.integrationRepository(server.id).updateRegistration(DeviceRegistration())
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to update phone control registration for server ${server.id}")
+                }
+            }
         }
     }
 }
