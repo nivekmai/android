@@ -107,6 +107,7 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -135,6 +136,7 @@ class MessagingManager @Inject constructor(
     private val assistConfigManager: AssistConfigManager,
     private val defaultAssistantManager: DefaultAssistantManager,
     private val bluetoothSensorManager: BluetoothSensorManager,
+    private val clockCommandManager: ClockCommandManager,
 ) {
     companion object {
         const val APP_PREFIX = "app://"
@@ -187,6 +189,8 @@ class MessagingManager @Inject constructor(
         const val COMMAND_BLUETOOTH = "command_bluetooth"
         const val COMMAND_SCREEN_ON = "command_screen_on"
         const val COMMAND_MEDIA = "command_media"
+        const val COMMAND_ALARM = DeviceCommandData.COMMAND_ALARM
+        const val COMMAND_TIMER = DeviceCommandData.COMMAND_TIMER
         const val COMMAND_HIGH_ACCURACY_MODE = "command_high_accuracy_mode"
         const val COMMAND_ACTIVITY = "command_activity"
         const val COMMAND_WEBVIEW = "command_webview"
@@ -224,6 +228,21 @@ class MessagingManager @Inject constructor(
         const val MEDIA_PACKAGE_NAME = "media_package_name"
         const val MEDIA_COMMAND = "media_command"
 
+        // Alarm command parameters
+        const val ALARM_HOUR = "alarm_hour"
+        const val ALARM_MINUTE = "alarm_minute"
+        const val ALARM_MESSAGE = "alarm_message"
+        const val ALARM_SKIP_UI = "alarm_skip_ui"
+
+        // Timer command parameters
+        const val TIMER_SECONDS = "timer_seconds"
+        const val TIMER_MESSAGE = "timer_message"
+        const val TIMER_SKIP_UI = "timer_skip_ui"
+
+        // Phone tool command parameters
+        const val PHONE_TOOL_REQUEST_ID = "phone_tool_request_id"
+        const val HASS_COMMAND_ID = "hass_command_id"
+
         // App-lock command parameters:
         const val APP_LOCK_ENABLED = "app_lock_enabled"
         const val APP_LOCK_TIMEOUT = "app_lock_timeout"
@@ -248,6 +267,8 @@ class MessagingManager @Inject constructor(
             COMMAND_WEBVIEW,
             COMMAND_SCREEN_ON,
             COMMAND_MEDIA,
+            COMMAND_ALARM,
+            COMMAND_TIMER,
             DeviceCommandData.COMMAND_UPDATE_SENSORS,
             COMMAND_LAUNCH_APP,
             COMMAND_APP_LOCK,
@@ -258,6 +279,7 @@ class MessagingManager @Inject constructor(
             COMMAND_FLASHLIGHT,
             COMMAND_WAKE_WORD_DETECTION,
         )
+        val CLOCK_COMMANDS = setOf(COMMAND_ALARM, COMMAND_TIMER)
         val DND_COMMANDS = listOf(DND_ALARMS_ONLY, DND_ALL, DND_NONE, DND_PRIORITY_ONLY)
         val RM_COMMANDS = listOf(RM_NORMAL, RM_SILENT, RM_VIBRATE)
         val CHANNEL_VOLUME_STREAM = listOf(
@@ -385,6 +407,13 @@ class MessagingManager @Inject constructor(
                 }
 
                 jsonData[NotificationData.MESSAGE] == TextToSpeechData.COMMAND_STOP_TTS -> textToSpeechClient.stopTTS()
+                jsonData[NotificationData.MESSAGE] in CLOCK_COMMANDS && !allowCommands -> {
+                    completeClockCommand(
+                        data = jsonData,
+                        serverId = webhookServerId.toString(),
+                        result = ClockCommandResult.Failure("Device commands from this server are disabled"),
+                    )
+                }
                 jsonData[NotificationData.MESSAGE] in DEVICE_COMMANDS && allowCommands -> {
                     Timber.d("Processing device command")
                     when (jsonData[NotificationData.MESSAGE]) {
@@ -561,6 +590,8 @@ class MessagingManager @Inject constructor(
                                 sendNotification(jsonData)
                             }
                         }
+
+                        COMMAND_ALARM, COMMAND_TIMER -> handleDeviceCommands(jsonData)
 
                         DeviceCommandData.COMMAND_UPDATE_SENSORS -> SensorReceiver.updateAllSensors(context)
                         COMMAND_LAUNCH_APP -> {
@@ -851,6 +882,10 @@ class MessagingManager @Inject constructor(
                 }
             }
 
+            COMMAND_ALARM -> handleAlarmCommand(data, serverId)
+
+            COMMAND_TIMER -> handleTimerCommand(data, serverId)
+
             COMMAND_LAUNCH_APP -> {
                 if (!Settings.canDrawOverlays(context)) {
                     notifyMissingPermission(message, serverId)
@@ -912,6 +947,76 @@ class MessagingManager @Inject constructor(
             }
 
             else -> Timber.d("No command received")
+        }
+    }
+
+    private suspend fun handleAlarmCommand(data: Map<String, String>, serverId: String) {
+        if (!assistConfigManager.isAlarmControlEnabled()) {
+            completeClockCommand(data, serverId, ClockCommandResult.Failure("Alarm control is disabled"))
+            return
+        }
+        val alarm = data.toAlarmCommand()
+        if (alarm == null) {
+            handleInvalidClockCommand(data, serverId, "Invalid alarm command")
+            return
+        }
+        val request = data.toClockCommandRequest(serverId.toInt())
+        completeClockCommand(data, serverId, clockCommandManager.setAlarm(alarm, request))
+    }
+
+    private suspend fun handleTimerCommand(data: Map<String, String>, serverId: String) {
+        if (!assistConfigManager.isTimerControlEnabled()) {
+            completeClockCommand(data, serverId, ClockCommandResult.Failure("Timer control is disabled"))
+            return
+        }
+        val timer = data.toTimerCommand()
+        if (timer == null) {
+            handleInvalidClockCommand(data, serverId, "Invalid timer command")
+            return
+        }
+        val request = data.toClockCommandRequest(serverId.toInt())
+        completeClockCommand(data, serverId, clockCommandManager.setTimer(timer, request))
+    }
+
+    private suspend fun handleInvalidClockCommand(data: Map<String, String>, serverId: String, error: String) {
+        Timber.d("$error received")
+        completeClockCommand(
+            data = data,
+            serverId = serverId,
+            result = ClockCommandResult.Failure(error),
+        )
+    }
+
+    private suspend fun completeClockCommand(data: Map<String, String>, serverId: String, result: ClockCommandResult) {
+        val request = data.toClockCommandRequest(serverId.toInt())
+        if (request == null) {
+            if (result is ClockCommandResult.Failure) {
+                sendNotification(data)
+            }
+            return
+        }
+
+        val acknowledged = try {
+            val repository = serverManager.webSocketRepository(request.serverId)
+            when (request.protocol) {
+                ClockCommandProtocol.Core -> repository.acknowledgeDeviceCommand(
+                    commandId = request.requestId,
+                    success = result is ClockCommandResult.Success,
+                )
+                ClockCommandProtocol.Legacy -> repository.acknowledgePhoneTool(
+                    requestId = request.requestId,
+                    success = result is ClockCommandResult.Success,
+                    error = (result as? ClockCommandResult.Failure)?.error,
+                )
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to acknowledge phone tool command")
+            false
+        }
+        if (!acknowledged) {
+            Timber.e("Server did not acknowledge clock command result")
         }
     }
 

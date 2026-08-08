@@ -192,6 +192,18 @@ interface PrefsRepository {
 
     suspend fun setSelectedWakeWord(wakeWord: String)
 
+    /** Returns whether Assist may create alarms in this device's Clock app. */
+    suspend fun isAssistAlarmControlEnabled(): Boolean
+
+    /** Sets whether Assist may create alarms in this device's Clock app. */
+    suspend fun setAssistAlarmControlEnabled(enabled: Boolean)
+
+    /** Returns whether Assist may create timers in this device's Clock app. */
+    suspend fun isAssistTimerControlEnabled(): Boolean
+
+    /** Sets whether Assist may create timers in this device's Clock app. */
+    suspend fun setAssistTimerControlEnabled(enabled: Boolean)
+
     suspend fun addAllowedTag(tag: String)
 
     suspend fun getAllowedTags(): Set<String>
