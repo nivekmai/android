@@ -23,6 +23,8 @@ import kotlinx.coroutines.launch
 data class AssistSettingsUiState(
     val isLoading: Boolean = true,
     val isDefaultAssistant: Boolean = false,
+    val isAlarmControlEnabled: Boolean = false,
+    val isTimerControlEnabled: Boolean = false,
     val isWakeWordEnabled: Boolean = false,
     val selectedWakeWordModel: MicroWakeWordModelConfig? = null,
     val availableModels: List<MicroWakeWordModelConfig> = emptyList(),
@@ -54,6 +56,8 @@ class AssistSettingsViewModel @Inject internal constructor(
             var isEnabled = assistConfigManager.isWakeWordEnabled()
             val selectedModel = assistConfigManager.getSelectedWakeWordModel() ?: models.firstOrNull()
             val isDefaultAssistant = defaultAssistantManager.isDefaultAssistant()
+            val isAlarmControlEnabled = assistConfigManager.isAlarmControlEnabled()
+            val isTimerControlEnabled = assistConfigManager.isTimerControlEnabled()
 
             if (!isDefaultAssistant && isEnabled) {
                 assistConfigManager.setWakeWordEnabled(false)
@@ -64,6 +68,8 @@ class AssistSettingsViewModel @Inject internal constructor(
                 it.copy(
                     isLoading = false,
                     isDefaultAssistant = isDefaultAssistant,
+                    isAlarmControlEnabled = isAlarmControlEnabled,
+                    isTimerControlEnabled = isTimerControlEnabled,
                     isWakeWordEnabled = isEnabled,
                     selectedWakeWordModel = selectedModel,
                     availableModels = models,
@@ -101,6 +107,22 @@ class AssistSettingsViewModel @Inject internal constructor(
             _uiState.update {
                 it.copy(isWakeWordEnabled = enabled, selectedWakeWordModel = model)
             }
+        }
+    }
+
+    /** Toggle whether Assist may create alarms in this phone's Clock app. */
+    fun onToggleAlarmControl(enabled: Boolean) {
+        _uiState.update { it.copy(isAlarmControlEnabled = enabled) }
+        viewModelScope.launch {
+            assistConfigManager.setAlarmControlEnabled(enabled)
+        }
+    }
+
+    /** Toggle whether Assist may create timers in this phone's Clock app. */
+    fun onToggleTimerControl(enabled: Boolean) {
+        _uiState.update { it.copy(isTimerControlEnabled = enabled) }
+        viewModelScope.launch {
+            assistConfigManager.setTimerControlEnabled(enabled)
         }
     }
 

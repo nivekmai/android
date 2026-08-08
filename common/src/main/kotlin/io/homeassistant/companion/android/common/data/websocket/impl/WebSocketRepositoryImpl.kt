@@ -57,6 +57,9 @@ import okhttp3.WebSocketListener
 
 private val matterTimeout = 2.minutes
 
+private const val PHONE_ASSIST_TOOLS_DOMAIN = "phone_assist_tools"
+private const val PHONE_ASSIST_TOOLS_ACKNOWLEDGE_SERVICE = "acknowledge"
+
 class WebSocketRepositoryImpl internal constructor(
     private val webSocketCore: WebSocketCore,
     private val serverManager: ServerManager,
@@ -72,6 +75,22 @@ class WebSocketRepositoryImpl internal constructor(
     }
 
     override suspend fun sendPing(): Boolean = webSocketCore.ping()
+
+    override suspend fun acknowledgePhoneTool(requestId: String, success: Boolean, error: String?): Boolean {
+        val response = webSocketCore.sendMessage(
+            mapOf(
+                "type" to "call_service",
+                "domain" to PHONE_ASSIST_TOOLS_DOMAIN,
+                "service" to PHONE_ASSIST_TOOLS_ACKNOWLEDGE_SERVICE,
+                "service_data" to mapOf(
+                    "request_id" to requestId,
+                    "success" to success,
+                    "error" to error,
+                ).filterValues { it != null },
+            ),
+        )
+        return response?.success == true
+    }
 
     override suspend fun getConfig(): GetConfigResponse? {
         val socketResponse = webSocketCore.sendMessage(
@@ -353,6 +372,20 @@ class WebSocketRepositoryImpl internal constructor(
                     "type" to "mobile_app/push_notification_confirm",
                     "webhook_id" to it.connection.webhookId!!,
                     "confirm_id" to confirmId,
+                ),
+            )
+        }
+        return response?.success == true
+    }
+
+    override suspend fun acknowledgeDeviceCommand(commandId: String, success: Boolean): Boolean {
+        val response = webSocketCore.server()?.let {
+            webSocketCore.sendMessage(
+                mapOf(
+                    "type" to "mobile_app/command_result",
+                    "webhook_id" to it.connection.webhookId!!,
+                    "hass_command_id" to commandId,
+                    "success" to success,
                 ),
             )
         }

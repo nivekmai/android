@@ -1,10 +1,17 @@
 package io.homeassistant.companion.android.settings.assist
 
 import android.content.Context
+import androidx.work.OneTimeWorkRequest
+import androidx.work.Operation
+import androidx.work.WorkManager
+import com.google.common.util.concurrent.Futures
 import io.homeassistant.companion.android.assist.service.AssistVoiceInteractionService
 import io.homeassistant.companion.android.assist.wakeword.MicroWakeWordModelConfig
+import io.homeassistant.companion.android.common.data.integration.IntegrationRepository
 import io.homeassistant.companion.android.common.data.prefs.PrefsRepository
+import io.homeassistant.companion.android.common.data.servers.ServerManager
 import io.homeassistant.companion.android.common.util.FailFast
+import io.homeassistant.companion.android.database.server.Server
 import io.homeassistant.companion.android.util.microWakeWordModelConfigs
 import io.mockk.Runs
 import io.mockk.coEvery
@@ -14,6 +21,7 @@ import io.mockk.just
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkAll
+import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -28,6 +36,8 @@ class AssistConfigManagerTest {
 
     private val context: Context = mockk(relaxed = true)
     private val prefsRepository: PrefsRepository = mockk(relaxed = true)
+    private val serverManager: ServerManager = mockk(relaxed = true)
+    private val workManager: WorkManager = mockk(relaxed = true)
     private lateinit var manager: AssistConfigManagerImpl
 
     @BeforeEach
@@ -38,8 +48,11 @@ class AssistConfigManagerTest {
         coEvery { MicroWakeWordModelConfig.loadAvailableModels(any()) } returns microWakeWordModelConfigs
         every { AssistVoiceInteractionService.startListening(any()) } just Runs
         every { AssistVoiceInteractionService.stopListening(any()) } just Runs
+        val resyncOperation = mockk<Operation>()
+        every { resyncOperation.result } returns Futures.immediateFuture(Operation.SUCCESS)
+        every { workManager.enqueue(any<OneTimeWorkRequest>()) } returns resyncOperation
 
-        manager = AssistConfigManagerImpl(context, prefsRepository)
+        manager = AssistConfigManagerImpl(context, prefsRepository, serverManager, workManager)
     }
 
     @AfterEach
@@ -122,7 +135,7 @@ class AssistConfigManagerTest {
         fun `Given no model selected and Okay Nabu unavailable when enabling then auto-select first available model`() = runTest {
             val modelsWithoutOkayNabu = microWakeWordModelConfigs.filter { it.wakeWord != "Okay Nabu" }
             coEvery { MicroWakeWordModelConfig.loadAvailableModels(any()) } returns modelsWithoutOkayNabu
-            manager = AssistConfigManagerImpl(context, prefsRepository)
+            manager = AssistConfigManagerImpl(context, prefsRepository, serverManager, workManager)
 
             coEvery { prefsRepository.setWakeWordEnabled(any()) } just Runs
             coEvery { prefsRepository.getSelectedWakeWord() } returns null
@@ -137,7 +150,7 @@ class AssistConfigManagerTest {
         @Test
         fun `Given no model selected and no models available when enabling then does not start listening`() = runTest {
             coEvery { MicroWakeWordModelConfig.loadAvailableModels(any()) } returns emptyList()
-            manager = AssistConfigManagerImpl(context, prefsRepository)
+            manager = AssistConfigManagerImpl(context, prefsRepository, serverManager, workManager)
 
             coEvery { prefsRepository.setWakeWordEnabled(any()) } just Runs
             coEvery { prefsRepository.getSelectedWakeWord() } returns null
@@ -232,6 +245,55 @@ class AssistConfigManagerTest {
 
             coVerify { prefsRepository.setSelectedWakeWord("Okay Nabu") }
             coVerify(exactly = 0) { AssistVoiceInteractionService.startListening(any()) }
+        }
+    }
+
+    @Nested
+    inner class PhoneControlsTest {
+
+        @Test
+        fun `Given saved phone controls when reading then return each setting`() = runTest {
+            coEvery { prefsRepository.isAssistAlarmControlEnabled() } returns true
+            coEvery { prefsRepository.isAssistTimerControlEnabled() } returns false
+
+            assertTrue(manager.isAlarmControlEnabled())
+            assertFalse(manager.isTimerControlEnabled())
+        }
+
+        @Test
+        fun `Given alarm control changed when saving then update every server registration`() = runTest {
+            val firstServer = mockk<Server> { every { id } returns 1 }
+            val secondServer = mockk<Server> { every { id } returns 2 }
+            val firstRepository = mockk<IntegrationRepository>(relaxed = true)
+            val secondRepository = mockk<IntegrationRepository>(relaxed = true)
+            coEvery { serverManager.servers() } returns listOf(firstServer, secondServer)
+            coEvery { serverManager.integrationRepository(1) } returns firstRepository
+            coEvery { serverManager.integrationRepository(2) } returns secondRepository
+
+            manager.setAlarmControlEnabled(true)
+
+            coVerify { prefsRepository.setAssistAlarmControlEnabled(true) }
+            coVerify { firstRepository.updateRegistration(any()) }
+            coVerify { secondRepository.updateRegistration(any()) }
+            verify { workManager.enqueue(any<OneTimeWorkRequest>()) }
+        }
+
+        @Test
+        fun `Given one registration update fails when saving timer control then update remaining servers`() = runTest {
+            val firstServer = mockk<Server> { every { id } returns 1 }
+            val secondServer = mockk<Server> { every { id } returns 2 }
+            val firstRepository = mockk<IntegrationRepository>()
+            val secondRepository = mockk<IntegrationRepository>(relaxed = true)
+            coEvery { serverManager.servers() } returns listOf(firstServer, secondServer)
+            coEvery { serverManager.integrationRepository(1) } returns firstRepository
+            coEvery { serverManager.integrationRepository(2) } returns secondRepository
+            coEvery { firstRepository.updateRegistration(any()) } throws IllegalStateException("offline")
+
+            manager.setTimerControlEnabled(true)
+
+            coVerify { prefsRepository.setAssistTimerControlEnabled(true) }
+            coVerify { secondRepository.updateRegistration(any()) }
+            verify { workManager.enqueue(any<OneTimeWorkRequest>()) }
         }
     }
 }
