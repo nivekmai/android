@@ -4,6 +4,7 @@ import io.homeassistant.companion.android.common.data.LocalStorage
 import io.homeassistant.companion.android.common.data.integration.impl.IntegrationRepositoryImpl
 import io.homeassistant.companion.android.common.data.integration.impl.IntegrationService
 import io.homeassistant.companion.android.common.data.integration.impl.entities.RateLimitResponse
+import io.homeassistant.companion.android.common.data.prefs.PrefsRepository
 import io.homeassistant.companion.android.common.data.servers.ServerManager
 import io.homeassistant.companion.android.common.data.websocket.impl.entities.AssistPipelineEvent
 import io.homeassistant.companion.android.common.data.websocket.impl.entities.GetConfigResponse
@@ -105,6 +106,7 @@ internal class IntegrationRepositoryFactory @Inject constructor(
     @NamedModel private val model: String,
     @NamedOsVersion private val osVersion: String,
     @NamedDeviceId private val deviceId: String,
+    private val prefsRepository: PrefsRepository,
 ) {
     suspend fun create(serverId: Int): IntegrationRepositoryImpl {
         return IntegrationRepositoryImpl(
@@ -116,6 +118,7 @@ internal class IntegrationRepositoryFactory @Inject constructor(
             model = model,
             osVersion = osVersion,
             deviceId = deviceId,
+            prefsRepository = prefsRepository,
         )
     }
 }

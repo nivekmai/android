@@ -23,6 +23,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -233,6 +234,92 @@ class WebSocketRepositoryImplTest {
     }
 
     @Nested
+    inner class AcknowledgeDeviceCommand {
+
+        @Test
+        fun `Given command result when acknowledging then send Core mobile app result`() = runTest {
+            val messageSlot = slot<Map<String, Any?>>()
+            coEvery { webSocketCore.server() } returns createServer()
+            coEvery { webSocketCore.sendMessage(capture(messageSlot)) } returns MessageSocketResponse(
+                id = 1,
+                success = true,
+            )
+
+            val acknowledged = repository.acknowledgeDeviceCommand(
+                commandId = "command-123",
+                success = true,
+            )
+
+            assertTrue(acknowledged)
+            assertEquals(
+                mapOf(
+                    "type" to "mobile_app/command_result",
+                    "webhook_id" to "webhook_id",
+                    "hass_command_id" to "command-123",
+                    "success" to true,
+                ),
+                messageSlot.captured,
+            )
+        }
+    }
+
+    @Nested
+    inner class AcknowledgePhoneTool {
+
+        private fun captureSentMessage(responseSuccess: Boolean): CapturingSlot<Map<String, Any?>> {
+            val messageSlot = slot<Map<String, Any?>>()
+            coEvery { webSocketCore.sendMessage(capture(messageSlot)) } returns MessageSocketResponse(
+                id = 1,
+                success = responseSuccess,
+            )
+            return messageSlot
+        }
+
+        @Test
+        fun `Given successful phone tool result when acknowledging then call acknowledgement service without error`() = runTest {
+            val messageSlot = captureSentMessage(responseSuccess = true)
+
+            val acknowledged = repository.acknowledgePhoneTool(
+                requestId = "request-123",
+                success = true,
+            )
+
+            assertTrue(acknowledged)
+            assertEquals("call_service", messageSlot.captured["type"])
+            assertEquals("phone_assist_tools", messageSlot.captured["domain"])
+            assertEquals("acknowledge", messageSlot.captured["service"])
+            assertEquals(
+                mapOf(
+                    "request_id" to "request-123",
+                    "success" to true,
+                ),
+                messageSlot.captured["service_data"],
+            )
+        }
+
+        @Test
+        fun `Given failed phone tool result when acknowledging then include error and return server result`() = runTest {
+            val messageSlot = captureSentMessage(responseSuccess = false)
+
+            val acknowledged = repository.acknowledgePhoneTool(
+                requestId = "request-456",
+                success = false,
+                error = "Unable to open the clock app",
+            )
+
+            assertFalse(acknowledged)
+            assertEquals(
+                mapOf(
+                    "request_id" to "request-456",
+                    "success" to false,
+                    "error" to "Unable to open the clock app",
+                ),
+                messageSlot.captured["service_data"],
+            )
+        }
+    }
+
+    @Nested
     inner class RegistryForDisplay {
 
         private fun captureSentMessage(resultJson: String, version: String = "2025.1.0"): CapturingSlot<Map<String, Any?>> {
@@ -300,6 +387,7 @@ class WebSocketRepositoryImplTest {
             deviceRegistryId = deviceRegistryId,
             connection = ServerConnectionInfo(
                 externalUrl = "https://example.com",
+                webhookId = "webhook_id",
             ),
             session = ServerSessionInfo(),
             user = ServerUserInfo(),

@@ -35,6 +35,8 @@ class AssistSettingsViewModelTest {
     fun setUp() {
         coEvery { assistConfigManager.getAvailableModels() } returns microWakeWordModelConfigs
         coEvery { assistConfigManager.isWakeWordEnabled() } returns false
+        coEvery { assistConfigManager.isAlarmControlEnabled() } returns false
+        coEvery { assistConfigManager.isTimerControlEnabled() } returns false
         coEvery { assistConfigManager.getSelectedWakeWordModel() } returns microWakeWordModelConfigs[0]
         every { defaultAssistantManager.isDefaultAssistant() } returns true
     }
@@ -115,6 +117,18 @@ class AssistSettingsViewModelTest {
 
             val state = viewModel.uiState.value
             assertNull(state.selectedWakeWordModel)
+        }
+
+        @Test
+        fun `Given phone controls enabled when initialized then load both settings`() = runTest {
+            coEvery { assistConfigManager.isAlarmControlEnabled() } returns true
+            coEvery { assistConfigManager.isTimerControlEnabled() } returns true
+
+            viewModel = createViewModel()
+            runCurrent()
+
+            assertTrue(viewModel.uiState.value.isAlarmControlEnabled)
+            assertTrue(viewModel.uiState.value.isTimerControlEnabled)
         }
     }
 
@@ -223,6 +237,34 @@ class AssistSettingsViewModelTest {
 
             assertEquals(microWakeWordModelConfigs[1], viewModel.uiState.value.selectedWakeWordModel)
             assertTrue(viewModel.uiState.value.isWakeWordEnabled)
+        }
+    }
+
+    @Nested
+    inner class TogglePhoneControlsTest {
+
+        @Test
+        fun `Given alarm control disabled when toggled then enable and save`() = runTest {
+            viewModel = createViewModel()
+            runCurrent()
+
+            viewModel.onToggleAlarmControl(true)
+            runCurrent()
+
+            assertTrue(viewModel.uiState.value.isAlarmControlEnabled)
+            coVerify { assistConfigManager.setAlarmControlEnabled(true) }
+        }
+
+        @Test
+        fun `Given timer control disabled when toggled then enable and save`() = runTest {
+            viewModel = createViewModel()
+            runCurrent()
+
+            viewModel.onToggleTimerControl(true)
+            runCurrent()
+
+            assertTrue(viewModel.uiState.value.isTimerControlEnabled)
+            coVerify { assistConfigManager.setTimerControlEnabled(true) }
         }
     }
 
