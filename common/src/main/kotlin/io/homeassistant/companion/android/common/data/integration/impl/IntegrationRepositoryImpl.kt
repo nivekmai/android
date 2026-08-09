@@ -703,6 +703,7 @@ class IntegrationRepositoryImpl @AssistedInject constructor(
             if (isTrusted()) {
                 if (prefsRepository.isAssistAlarmControlEnabled()) add(DeviceCommandData.COMMAND_ALARM)
                 if (prefsRepository.isAssistTimerControlEnabled()) add(DeviceCommandData.COMMAND_TIMER)
+                if (prefsRepository.isAssistMediaControlEnabled()) add(DeviceCommandData.COMMAND_PLAY_MEDIA)
             }
         }
         if (!pushToken.isNullOrBlank()) {
