@@ -21,12 +21,34 @@ class MediaPlaybackCommandManagerTest {
     }
 
     @Test
+    fun `Given audiobook placeholder query when parsing then ignore query`() {
+        assertEquals(
+            PlayMediaCommand(PhoneMediaType.AUDIOBOOK, null),
+            mapOf(
+                MessagingManager.MEDIA_TYPE to "audiobook",
+                MessagingManager.MEDIA_QUERY to "current book",
+            ).toPlayMediaCommand(),
+        )
+    }
+
+    @Test
     fun `Given music query when parsing then trim query`() {
         assertEquals(
             PlayMediaCommand(PhoneMediaType.MUSIC, "My Supermix"),
             mapOf(
                 MessagingManager.MEDIA_TYPE to "music",
                 MessagingManager.MEDIA_QUERY to "  My Supermix  ",
+            ).toPlayMediaCommand(),
+        )
+    }
+
+    @Test
+    fun `Given generic music query when parsing then use default playback`() {
+        assertEquals(
+            PlayMediaCommand(PhoneMediaType.MUSIC, null),
+            mapOf(
+                MessagingManager.MEDIA_TYPE to "music",
+                MessagingManager.MEDIA_QUERY to "usual music",
             ).toPlayMediaCommand(),
         )
     }
