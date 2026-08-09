@@ -433,12 +433,14 @@ class PrefsRepositoryImplTest {
     }
 
     @Test
-    fun `Given phone controls not configured when reading then both default to disabled`() = runTest {
+    fun `Given phone controls not configured when reading then all default to disabled`() = runTest {
         coEvery { localStorage.getBooleanOrNull("assist_alarm_control_enabled") } returns null
         coEvery { localStorage.getBooleanOrNull("assist_timer_control_enabled") } returns null
+        coEvery { localStorage.getBooleanOrNull("assist_media_control_enabled") } returns null
 
         assertFalse(repository.isAssistAlarmControlEnabled())
         assertFalse(repository.isAssistTimerControlEnabled())
+        assertFalse(repository.isAssistMediaControlEnabled())
     }
 
     @Test
@@ -447,8 +449,10 @@ class PrefsRepositoryImplTest {
 
         repository.setAssistAlarmControlEnabled(true)
         repository.setAssistTimerControlEnabled(false)
+        repository.setAssistMediaControlEnabled(true)
 
         coVerify { localStorage.putBoolean("assist_alarm_control_enabled", true) }
         coVerify { localStorage.putBoolean("assist_timer_control_enabled", false) }
+        coVerify { localStorage.putBoolean("assist_media_control_enabled", true) }
     }
 }

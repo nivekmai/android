@@ -255,9 +255,11 @@ class AssistConfigManagerTest {
         fun `Given saved phone controls when reading then return each setting`() = runTest {
             coEvery { prefsRepository.isAssistAlarmControlEnabled() } returns true
             coEvery { prefsRepository.isAssistTimerControlEnabled() } returns false
+            coEvery { prefsRepository.isAssistMediaControlEnabled() } returns true
 
             assertTrue(manager.isAlarmControlEnabled())
             assertFalse(manager.isTimerControlEnabled())
+            assertTrue(manager.isMediaControlEnabled())
         }
 
         @Test

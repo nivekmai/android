@@ -74,6 +74,12 @@ interface AssistConfigManager {
 
     /** Enables or disables creating timers and updates every server registration. */
     suspend fun setTimerControlEnabled(enabled: Boolean)
+
+    /** Returns whether Assist may start or resume media on this phone. */
+    suspend fun isMediaControlEnabled(): Boolean
+
+    /** Enables or disables media playback and updates every server registration. */
+    suspend fun setMediaControlEnabled(enabled: Boolean)
 }
 
 class AssistConfigManagerImpl @Inject constructor(
@@ -141,6 +147,14 @@ class AssistConfigManagerImpl @Inject constructor(
     override suspend fun setTimerControlEnabled(enabled: Boolean) {
         updatePhoneControlSettings {
             prefsRepository.setAssistTimerControlEnabled(enabled)
+        }
+    }
+
+    override suspend fun isMediaControlEnabled(): Boolean = prefsRepository.isAssistMediaControlEnabled()
+
+    override suspend fun setMediaControlEnabled(enabled: Boolean) {
+        updatePhoneControlSettings {
+            prefsRepository.setAssistMediaControlEnabled(enabled)
         }
     }
 

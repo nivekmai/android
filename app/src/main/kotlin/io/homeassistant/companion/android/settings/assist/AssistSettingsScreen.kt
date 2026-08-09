@@ -1,6 +1,8 @@
 package io.homeassistant.companion.android.settings.assist
 
 import android.Manifest
+import android.content.Intent
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -45,6 +47,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState
@@ -103,6 +106,7 @@ private fun rememberRecordAudioPermissionState(
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun AssistSettingsScreen(viewModel: AssistSettingsViewModel, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -141,6 +145,12 @@ fun AssistSettingsScreen(viewModel: AssistSettingsViewModel, modifier: Modifier 
             },
             onToggleAlarmControl = viewModel::onToggleAlarmControl,
             onToggleTimerControl = viewModel::onToggleTimerControl,
+            onToggleMediaControl = { enabled ->
+                viewModel.onToggleMediaControl(enabled)
+                if (enabled && context.packageName !in NotificationManagerCompat.getEnabledListenerPackages(context)) {
+                    context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                }
+            },
             onSelectWakeWord = viewModel::onSelectWakeWordModel,
             onStartTestWakeWord = { viewModel.setTestingWakeWord(true) },
             onStopTestWakeWord = { viewModel.setTestingWakeWord(false) },
@@ -158,6 +168,7 @@ internal fun AssistSettingsContent(
     onToggleWakeWord: (Boolean) -> Unit,
     onToggleAlarmControl: (Boolean) -> Unit = {},
     onToggleTimerControl: (Boolean) -> Unit = {},
+    onToggleMediaControl: (Boolean) -> Unit = {},
     onSelectWakeWord: (MicroWakeWordModelConfig) -> Unit,
     onStartTestWakeWord: () -> Unit,
     onStopTestWakeWord: () -> Unit,
@@ -192,8 +203,10 @@ internal fun AssistSettingsContent(
             PhoneControlsCard(
                 alarmEnabled = uiState.isAlarmControlEnabled,
                 timerEnabled = uiState.isTimerControlEnabled,
+                mediaEnabled = uiState.isMediaControlEnabled,
                 onToggleAlarm = onToggleAlarmControl,
                 onToggleTimer = onToggleTimerControl,
+                onToggleMedia = onToggleMediaControl,
             )
             HAHint(
                 text = stringResource(commonR.string.assist_phone_controls_summary),
@@ -228,8 +241,10 @@ internal fun AssistSettingsContent(
 private fun PhoneControlsCard(
     alarmEnabled: Boolean,
     timerEnabled: Boolean,
+    mediaEnabled: Boolean,
     onToggleAlarm: (Boolean) -> Unit,
     onToggleTimer: (Boolean) -> Unit,
+    onToggleMedia: (Boolean) -> Unit,
 ) {
     HASettingsCard {
         Column(verticalArrangement = Arrangement.spacedBy(HADimens.SPACE4)) {
@@ -242,6 +257,11 @@ private fun PhoneControlsCard(
                 label = stringResource(commonR.string.assist_phone_controls_timers),
                 enabled = timerEnabled,
                 onToggle = onToggleTimer,
+            )
+            PhoneControlToggleRow(
+                label = stringResource(commonR.string.assist_phone_controls_media),
+                enabled = mediaEnabled,
+                onToggle = onToggleMedia,
             )
         }
     }

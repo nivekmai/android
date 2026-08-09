@@ -223,12 +223,13 @@ class IntegrationRepositoryImplTest {
             coEvery { localStorage.getString(any()) } returns null
             coEvery { prefsRepository.isAssistAlarmControlEnabled() } returns true
             coEvery { prefsRepository.isAssistTimerControlEnabled() } returns true
+            coEvery { prefsRepository.isAssistMediaControlEnabled() } returns true
 
             repository.updateRegistration(DeviceRegistration())
 
             val request = requestSlot.captured as RegisterDeviceIntegrationRequest
             assertEquals(
-                listOf("command_alarm", "command_timer"),
+                listOf("command_alarm", "command_timer", "command_play_media"),
                 request.data.appData?.get("supported_device_commands"),
             )
         }
@@ -241,6 +242,7 @@ class IntegrationRepositoryImplTest {
             coEvery { localStorage.getString(any()) } returns null
             coEvery { prefsRepository.isAssistAlarmControlEnabled() } returns false
             coEvery { prefsRepository.isAssistTimerControlEnabled() } returns false
+            coEvery { prefsRepository.isAssistMediaControlEnabled() } returns false
 
             repository.updateRegistration(DeviceRegistration())
 
@@ -257,6 +259,7 @@ class IntegrationRepositoryImplTest {
             coEvery { localStorage.getBooleanOrNull("${serverID}_trusted") } returns false
             coEvery { prefsRepository.isAssistAlarmControlEnabled() } returns true
             coEvery { prefsRepository.isAssistTimerControlEnabled() } returns true
+            coEvery { prefsRepository.isAssistMediaControlEnabled() } returns true
 
             repository.updateRegistration(DeviceRegistration())
 
@@ -272,6 +275,7 @@ class IntegrationRepositoryImplTest {
             var alarmEnabled = false
             coEvery { prefsRepository.isAssistAlarmControlEnabled() } coAnswers { alarmEnabled }
             coEvery { prefsRepository.isAssistTimerControlEnabled() } returns false
+            coEvery { prefsRepository.isAssistMediaControlEnabled() } returns false
             coEvery { localStorage.getString(any()) } returns null
             coEvery { integrationService.callWebhook(any(), any()) } coAnswers {
                 requests += secondArg<IntegrationRequest>() as RegisterDeviceIntegrationRequest

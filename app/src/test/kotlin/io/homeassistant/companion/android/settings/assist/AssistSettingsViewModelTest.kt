@@ -37,6 +37,7 @@ class AssistSettingsViewModelTest {
         coEvery { assistConfigManager.isWakeWordEnabled() } returns false
         coEvery { assistConfigManager.isAlarmControlEnabled() } returns false
         coEvery { assistConfigManager.isTimerControlEnabled() } returns false
+        coEvery { assistConfigManager.isMediaControlEnabled() } returns false
         coEvery { assistConfigManager.getSelectedWakeWordModel() } returns microWakeWordModelConfigs[0]
         every { defaultAssistantManager.isDefaultAssistant() } returns true
     }
@@ -265,6 +266,18 @@ class AssistSettingsViewModelTest {
 
             assertTrue(viewModel.uiState.value.isTimerControlEnabled)
             coVerify { assistConfigManager.setTimerControlEnabled(true) }
+        }
+
+        @Test
+        fun `Given media control disabled when toggled then enable and save`() = runTest {
+            viewModel = createViewModel()
+            runCurrent()
+
+            viewModel.onToggleMediaControl(true)
+            runCurrent()
+
+            assertTrue(viewModel.uiState.value.isMediaControlEnabled)
+            coVerify { assistConfigManager.setMediaControlEnabled(true) }
         }
     }
 
