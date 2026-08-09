@@ -27,6 +27,7 @@ private val MUSIC_PACKAGES = listOf(
     "com.aspiro.tidal",
     "deezer.android.app",
 )
+private val GENERIC_MUSIC_QUERIES = setOf("music", "my music", "usual music", "my usual music")
 
 internal enum class PhoneMediaType(val value: String) {
     AUDIOBOOK("audiobook"),
@@ -118,6 +119,10 @@ class MediaPlaybackCommandManager internal constructor(
 
 internal fun Map<String, String>.toPlayMediaCommand(): PlayMediaCommand? {
     val type = PhoneMediaType.fromValue(get(MessagingManager.MEDIA_TYPE)) ?: return null
-    val query = get(MessagingManager.MEDIA_QUERY)?.trim()?.takeIf(String::isNotEmpty)
+    val requestedQuery = get(MessagingManager.MEDIA_QUERY)?.trim()?.takeIf(String::isNotEmpty)
+    val query = when (type) {
+        PhoneMediaType.AUDIOBOOK -> null
+        PhoneMediaType.MUSIC -> requestedQuery?.takeUnless { it.lowercase() in GENERIC_MUSIC_QUERIES }
+    }
     return PlayMediaCommand(type, query)
 }
