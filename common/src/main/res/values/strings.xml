@@ -1248,6 +1248,7 @@
     <string name="assist_phone_controls_summary">Allow Assist requests from your Home Assistant servers to create alarms and timers in this phone\'s Clock app. Each control is optional and applies only to this phone.</string>
     <string name="assist_phone_controls_alarms">Create alarms</string>
     <string name="assist_phone_controls_timers">Create timers</string>
+    <string name="assist_phone_controls_media">Play music and audiobooks</string>
     <string name="assist_wake_word_title">Wake word</string>
     <string name="assist_wake_word_enable">Enable wake word detection</string>
     <string name="assist_wake_word_model">Wake word</string>

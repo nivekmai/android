@@ -204,6 +204,12 @@ interface PrefsRepository {
     /** Sets whether Assist may create timers in this device's Clock app. */
     suspend fun setAssistTimerControlEnabled(enabled: Boolean)
 
+    /** Returns whether Assist may start or resume media on this device. */
+    suspend fun isAssistMediaControlEnabled(): Boolean
+
+    /** Sets whether Assist may start or resume media on this device. */
+    suspend fun setAssistMediaControlEnabled(enabled: Boolean)
+
     suspend fun addAllowedTag(tag: String)
 
     suspend fun getAllowedTags(): Set<String>

@@ -137,6 +137,7 @@ class MessagingManager @Inject constructor(
     private val defaultAssistantManager: DefaultAssistantManager,
     private val bluetoothSensorManager: BluetoothSensorManager,
     private val clockCommandManager: ClockCommandManager,
+    private val mediaPlaybackCommandManager: MediaPlaybackCommandManager,
 ) {
     companion object {
         const val APP_PREFIX = "app://"
@@ -190,6 +191,7 @@ class MessagingManager @Inject constructor(
         const val COMMAND_SCREEN_ON = "command_screen_on"
         const val COMMAND_MEDIA = "command_media"
         const val COMMAND_ALARM = DeviceCommandData.COMMAND_ALARM
+        const val COMMAND_PLAY_MEDIA = DeviceCommandData.COMMAND_PLAY_MEDIA
         const val COMMAND_TIMER = DeviceCommandData.COMMAND_TIMER
         const val COMMAND_HIGH_ACCURACY_MODE = "command_high_accuracy_mode"
         const val COMMAND_ACTIVITY = "command_activity"
@@ -239,6 +241,10 @@ class MessagingManager @Inject constructor(
         const val TIMER_MESSAGE = "timer_message"
         const val TIMER_SKIP_UI = "timer_skip_ui"
 
+        // Assist media playback parameters
+        const val MEDIA_TYPE = "media_type"
+        const val MEDIA_QUERY = "media_query"
+
         // Phone tool command parameters
         const val PHONE_TOOL_REQUEST_ID = "phone_tool_request_id"
         const val HASS_COMMAND_ID = "hass_command_id"
@@ -268,6 +274,7 @@ class MessagingManager @Inject constructor(
             COMMAND_SCREEN_ON,
             COMMAND_MEDIA,
             COMMAND_ALARM,
+            COMMAND_PLAY_MEDIA,
             COMMAND_TIMER,
             DeviceCommandData.COMMAND_UPDATE_SENSORS,
             COMMAND_LAUNCH_APP,
@@ -279,7 +286,7 @@ class MessagingManager @Inject constructor(
             COMMAND_FLASHLIGHT,
             COMMAND_WAKE_WORD_DETECTION,
         )
-        val CLOCK_COMMANDS = setOf(COMMAND_ALARM, COMMAND_TIMER)
+        val ACKNOWLEDGED_DEVICE_COMMANDS = setOf(COMMAND_ALARM, COMMAND_PLAY_MEDIA, COMMAND_TIMER)
         val DND_COMMANDS = listOf(DND_ALARMS_ONLY, DND_ALL, DND_NONE, DND_PRIORITY_ONLY)
         val RM_COMMANDS = listOf(RM_NORMAL, RM_SILENT, RM_VIBRATE)
         val CHANNEL_VOLUME_STREAM = listOf(
@@ -407,8 +414,8 @@ class MessagingManager @Inject constructor(
                 }
 
                 jsonData[NotificationData.MESSAGE] == TextToSpeechData.COMMAND_STOP_TTS -> textToSpeechClient.stopTTS()
-                jsonData[NotificationData.MESSAGE] in CLOCK_COMMANDS && !allowCommands -> {
-                    completeClockCommand(
+                jsonData[NotificationData.MESSAGE] in ACKNOWLEDGED_DEVICE_COMMANDS && !allowCommands -> {
+                    completeDeviceCommand(
                         data = jsonData,
                         serverId = webhookServerId.toString(),
                         result = ClockCommandResult.Failure("Device commands from this server are disabled"),
@@ -591,7 +598,7 @@ class MessagingManager @Inject constructor(
                             }
                         }
 
-                        COMMAND_ALARM, COMMAND_TIMER -> handleDeviceCommands(jsonData)
+                        COMMAND_ALARM, COMMAND_PLAY_MEDIA, COMMAND_TIMER -> handleDeviceCommands(jsonData)
 
                         DeviceCommandData.COMMAND_UPDATE_SENSORS -> SensorReceiver.updateAllSensors(context)
                         COMMAND_LAUNCH_APP -> {
@@ -886,6 +893,8 @@ class MessagingManager @Inject constructor(
 
             COMMAND_TIMER -> handleTimerCommand(data, serverId)
 
+            COMMAND_PLAY_MEDIA -> handlePlayMediaCommand(data, serverId)
+
             COMMAND_LAUNCH_APP -> {
                 if (!Settings.canDrawOverlays(context)) {
                     notifyMissingPermission(message, serverId)
@@ -952,7 +961,7 @@ class MessagingManager @Inject constructor(
 
     private suspend fun handleAlarmCommand(data: Map<String, String>, serverId: String) {
         if (!assistConfigManager.isAlarmControlEnabled()) {
-            completeClockCommand(data, serverId, ClockCommandResult.Failure("Alarm control is disabled"))
+            completeDeviceCommand(data, serverId, ClockCommandResult.Failure("Alarm control is disabled"))
             return
         }
         val alarm = data.toAlarmCommand()
@@ -961,12 +970,12 @@ class MessagingManager @Inject constructor(
             return
         }
         val request = data.toClockCommandRequest(serverId.toInt())
-        completeClockCommand(data, serverId, clockCommandManager.setAlarm(alarm, request))
+        completeDeviceCommand(data, serverId, clockCommandManager.setAlarm(alarm, request))
     }
 
     private suspend fun handleTimerCommand(data: Map<String, String>, serverId: String) {
         if (!assistConfigManager.isTimerControlEnabled()) {
-            completeClockCommand(data, serverId, ClockCommandResult.Failure("Timer control is disabled"))
+            completeDeviceCommand(data, serverId, ClockCommandResult.Failure("Timer control is disabled"))
             return
         }
         val timer = data.toTimerCommand()
@@ -975,19 +984,32 @@ class MessagingManager @Inject constructor(
             return
         }
         val request = data.toClockCommandRequest(serverId.toInt())
-        completeClockCommand(data, serverId, clockCommandManager.setTimer(timer, request))
+        completeDeviceCommand(data, serverId, clockCommandManager.setTimer(timer, request))
+    }
+
+    private suspend fun handlePlayMediaCommand(data: Map<String, String>, serverId: String) {
+        if (!assistConfigManager.isMediaControlEnabled()) {
+            completeDeviceCommand(data, serverId, ClockCommandResult.Failure("Media control is disabled"))
+            return
+        }
+        val command = data.toPlayMediaCommand()
+        if (command == null) {
+            completeDeviceCommand(data, serverId, ClockCommandResult.Failure("Invalid media playback command"))
+            return
+        }
+        completeDeviceCommand(data, serverId, mediaPlaybackCommandManager.play(command))
     }
 
     private suspend fun handleInvalidClockCommand(data: Map<String, String>, serverId: String, error: String) {
         Timber.d("$error received")
-        completeClockCommand(
+        completeDeviceCommand(
             data = data,
             serverId = serverId,
             result = ClockCommandResult.Failure(error),
         )
     }
 
-    private suspend fun completeClockCommand(data: Map<String, String>, serverId: String, result: ClockCommandResult) {
+    private suspend fun completeDeviceCommand(data: Map<String, String>, serverId: String, result: ClockCommandResult) {
         val request = data.toClockCommandRequest(serverId.toInt())
         if (request == null) {
             if (result is ClockCommandResult.Failure) {

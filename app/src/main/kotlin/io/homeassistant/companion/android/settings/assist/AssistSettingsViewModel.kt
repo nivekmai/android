@@ -25,6 +25,7 @@ data class AssistSettingsUiState(
     val isDefaultAssistant: Boolean = false,
     val isAlarmControlEnabled: Boolean = false,
     val isTimerControlEnabled: Boolean = false,
+    val isMediaControlEnabled: Boolean = false,
     val isWakeWordEnabled: Boolean = false,
     val selectedWakeWordModel: MicroWakeWordModelConfig? = null,
     val availableModels: List<MicroWakeWordModelConfig> = emptyList(),
@@ -58,6 +59,7 @@ class AssistSettingsViewModel @Inject internal constructor(
             val isDefaultAssistant = defaultAssistantManager.isDefaultAssistant()
             val isAlarmControlEnabled = assistConfigManager.isAlarmControlEnabled()
             val isTimerControlEnabled = assistConfigManager.isTimerControlEnabled()
+            val isMediaControlEnabled = assistConfigManager.isMediaControlEnabled()
 
             if (!isDefaultAssistant && isEnabled) {
                 assistConfigManager.setWakeWordEnabled(false)
@@ -70,6 +72,7 @@ class AssistSettingsViewModel @Inject internal constructor(
                     isDefaultAssistant = isDefaultAssistant,
                     isAlarmControlEnabled = isAlarmControlEnabled,
                     isTimerControlEnabled = isTimerControlEnabled,
+                    isMediaControlEnabled = isMediaControlEnabled,
                     isWakeWordEnabled = isEnabled,
                     selectedWakeWordModel = selectedModel,
                     availableModels = models,
@@ -123,6 +126,14 @@ class AssistSettingsViewModel @Inject internal constructor(
         _uiState.update { it.copy(isTimerControlEnabled = enabled) }
         viewModelScope.launch {
             assistConfigManager.setTimerControlEnabled(enabled)
+        }
+    }
+
+    /** Toggle whether Assist may start or resume media on this phone. */
+    fun onToggleMediaControl(enabled: Boolean) {
+        _uiState.update { it.copy(isMediaControlEnabled = enabled) }
+        viewModelScope.launch {
+            assistConfigManager.setMediaControlEnabled(enabled)
         }
     }
 
