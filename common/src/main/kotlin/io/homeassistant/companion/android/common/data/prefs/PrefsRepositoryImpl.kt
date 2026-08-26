@@ -48,6 +48,8 @@ private const val PREF_SELECTED_WAKE_WORD = "selected_wake_word"
 private const val PREF_ASSIST_ALARM_CONTROL_ENABLED = "assist_alarm_control_enabled"
 private const val PREF_ASSIST_TIMER_CONTROL_ENABLED = "assist_timer_control_enabled"
 private const val PREF_ASSIST_MEDIA_CONTROL_ENABLED = "assist_media_control_enabled"
+private const val PREF_ASSIST_GMAIL_READ_ENABLED = "assist_gmail_read_enabled"
+private const val PREF_ASSIST_DRIVE_READ_ENABLED = "assist_drive_read_enabled"
 private const val PREF_ALLOWED_TAGS = "allowed_tags"
 
 /**
@@ -469,6 +471,22 @@ internal class PrefsRepositoryImpl @Inject constructor(
 
     override suspend fun setAssistMediaControlEnabled(enabled: Boolean) {
         localStorage().putBoolean(PREF_ASSIST_MEDIA_CONTROL_ENABLED, enabled)
+    }
+
+    override suspend fun isAssistGmailReadEnabled(): Boolean {
+        return localStorage().getBooleanOrNull(PREF_ASSIST_GMAIL_READ_ENABLED) ?: false
+    }
+
+    override suspend fun setAssistGmailReadEnabled(enabled: Boolean) {
+        localStorage().putBoolean(PREF_ASSIST_GMAIL_READ_ENABLED, enabled)
+    }
+
+    override suspend fun isAssistDriveReadEnabled(): Boolean {
+        return localStorage().getBooleanOrNull(PREF_ASSIST_DRIVE_READ_ENABLED) ?: false
+    }
+
+    override suspend fun setAssistDriveReadEnabled(enabled: Boolean) {
+        localStorage().putBoolean(PREF_ASSIST_DRIVE_READ_ENABLED, enabled)
     }
 
     override suspend fun addAllowedTag(tag: String) {

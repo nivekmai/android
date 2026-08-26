@@ -151,6 +151,8 @@ fun AssistSettingsScreen(viewModel: AssistSettingsViewModel, modifier: Modifier 
                     context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                 }
             },
+            onToggleGmailRead = viewModel::onToggleGmailRead,
+            onToggleDriveRead = viewModel::onToggleDriveRead,
             onSelectWakeWord = viewModel::onSelectWakeWordModel,
             onStartTestWakeWord = { viewModel.setTestingWakeWord(true) },
             onStopTestWakeWord = { viewModel.setTestingWakeWord(false) },
@@ -169,6 +171,8 @@ internal fun AssistSettingsContent(
     onToggleAlarmControl: (Boolean) -> Unit = {},
     onToggleTimerControl: (Boolean) -> Unit = {},
     onToggleMediaControl: (Boolean) -> Unit = {},
+    onToggleGmailRead: (Boolean) -> Unit = {},
+    onToggleDriveRead: (Boolean) -> Unit = {},
     onSelectWakeWord: (MicroWakeWordModelConfig) -> Unit,
     onStartTestWakeWord: () -> Unit,
     onStopTestWakeWord: () -> Unit,
@@ -210,6 +214,23 @@ internal fun AssistSettingsContent(
             )
             HAHint(
                 text = stringResource(commonR.string.assist_phone_controls_summary),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Spacer(modifier = Modifier.height(HADimens.SPACE2))
+
+            SectionHeader(
+                text = stringResource(commonR.string.assist_personal_data_title),
+                modifier = Modifier.padding(bottom = HADimens.SPACE1),
+            )
+            PersonalDataCard(
+                gmailEnabled = uiState.isGmailReadEnabled,
+                driveEnabled = uiState.isDriveReadEnabled,
+                onToggleGmail = onToggleGmailRead,
+                onToggleDrive = onToggleDriveRead,
+            )
+            HAHint(
+                text = stringResource(commonR.string.assist_personal_data_summary),
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -282,6 +303,29 @@ private fun PhoneControlToggleRow(label: String, enabled: Boolean, onToggle: (Bo
             modifier = Modifier.weight(1f),
         )
         HASwitch(checked = enabled, onCheckedChange = onToggle)
+    }
+}
+
+@Composable
+private fun PersonalDataCard(
+    gmailEnabled: Boolean,
+    driveEnabled: Boolean,
+    onToggleGmail: (Boolean) -> Unit,
+    onToggleDrive: (Boolean) -> Unit,
+) {
+    HASettingsCard {
+        Column(verticalArrangement = Arrangement.spacedBy(HADimens.SPACE4)) {
+            PhoneControlToggleRow(
+                label = stringResource(commonR.string.assist_personal_data_gmail),
+                enabled = gmailEnabled,
+                onToggle = onToggleGmail,
+            )
+            PhoneControlToggleRow(
+                label = stringResource(commonR.string.assist_personal_data_drive),
+                enabled = driveEnabled,
+                onToggle = onToggleDrive,
+            )
+        }
     }
 }
 

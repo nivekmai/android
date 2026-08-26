@@ -437,10 +437,14 @@ class PrefsRepositoryImplTest {
         coEvery { localStorage.getBooleanOrNull("assist_alarm_control_enabled") } returns null
         coEvery { localStorage.getBooleanOrNull("assist_timer_control_enabled") } returns null
         coEvery { localStorage.getBooleanOrNull("assist_media_control_enabled") } returns null
+        coEvery { localStorage.getBooleanOrNull("assist_gmail_read_enabled") } returns null
+        coEvery { localStorage.getBooleanOrNull("assist_drive_read_enabled") } returns null
 
         assertFalse(repository.isAssistAlarmControlEnabled())
         assertFalse(repository.isAssistTimerControlEnabled())
         assertFalse(repository.isAssistMediaControlEnabled())
+        assertFalse(repository.isAssistGmailReadEnabled())
+        assertFalse(repository.isAssistDriveReadEnabled())
     }
 
     @Test
@@ -450,9 +454,13 @@ class PrefsRepositoryImplTest {
         repository.setAssistAlarmControlEnabled(true)
         repository.setAssistTimerControlEnabled(false)
         repository.setAssistMediaControlEnabled(true)
+        repository.setAssistGmailReadEnabled(true)
+        repository.setAssistDriveReadEnabled(false)
 
         coVerify { localStorage.putBoolean("assist_alarm_control_enabled", true) }
         coVerify { localStorage.putBoolean("assist_timer_control_enabled", false) }
         coVerify { localStorage.putBoolean("assist_media_control_enabled", true) }
+        coVerify { localStorage.putBoolean("assist_gmail_read_enabled", true) }
+        coVerify { localStorage.putBoolean("assist_drive_read_enabled", false) }
     }
 }

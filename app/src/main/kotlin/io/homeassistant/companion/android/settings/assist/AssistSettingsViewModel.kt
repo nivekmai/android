@@ -26,6 +26,8 @@ data class AssistSettingsUiState(
     val isAlarmControlEnabled: Boolean = false,
     val isTimerControlEnabled: Boolean = false,
     val isMediaControlEnabled: Boolean = false,
+    val isGmailReadEnabled: Boolean = false,
+    val isDriveReadEnabled: Boolean = false,
     val isWakeWordEnabled: Boolean = false,
     val selectedWakeWordModel: MicroWakeWordModelConfig? = null,
     val availableModels: List<MicroWakeWordModelConfig> = emptyList(),
@@ -60,6 +62,8 @@ class AssistSettingsViewModel @Inject internal constructor(
             val isAlarmControlEnabled = assistConfigManager.isAlarmControlEnabled()
             val isTimerControlEnabled = assistConfigManager.isTimerControlEnabled()
             val isMediaControlEnabled = assistConfigManager.isMediaControlEnabled()
+            val isGmailReadEnabled = assistConfigManager.isGmailReadEnabled()
+            val isDriveReadEnabled = assistConfigManager.isDriveReadEnabled()
 
             if (!isDefaultAssistant && isEnabled) {
                 assistConfigManager.setWakeWordEnabled(false)
@@ -73,6 +77,8 @@ class AssistSettingsViewModel @Inject internal constructor(
                     isAlarmControlEnabled = isAlarmControlEnabled,
                     isTimerControlEnabled = isTimerControlEnabled,
                     isMediaControlEnabled = isMediaControlEnabled,
+                    isGmailReadEnabled = isGmailReadEnabled,
+                    isDriveReadEnabled = isDriveReadEnabled,
                     isWakeWordEnabled = isEnabled,
                     selectedWakeWordModel = selectedModel,
                     availableModels = models,
@@ -135,6 +141,16 @@ class AssistSettingsViewModel @Inject internal constructor(
         viewModelScope.launch {
             assistConfigManager.setMediaControlEnabled(enabled)
         }
+    }
+
+    fun onToggleGmailRead(enabled: Boolean) {
+        _uiState.update { it.copy(isGmailReadEnabled = enabled) }
+        viewModelScope.launch { assistConfigManager.setGmailReadEnabled(enabled) }
+    }
+
+    fun onToggleDriveRead(enabled: Boolean) {
+        _uiState.update { it.copy(isDriveReadEnabled = enabled) }
+        viewModelScope.launch { assistConfigManager.setDriveReadEnabled(enabled) }
     }
 
     /**

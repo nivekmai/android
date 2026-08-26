@@ -1,9 +1,11 @@
 package io.homeassistant.companion.android.common.data.websocket.impl
 
+import io.homeassistant.companion.android.common.assist.PersonalDataKeyManager
 import io.homeassistant.companion.android.common.data.HomeAssistantVersion
 import io.homeassistant.companion.android.common.data.integration.ActionData
 import io.homeassistant.companion.android.common.data.integration.IntegrationDomains.TODO_DOMAIN
 import io.homeassistant.companion.android.common.data.integration.impl.entities.EntityResponse
+import io.homeassistant.companion.android.common.data.prefs.PrefsRepository
 import io.homeassistant.companion.android.common.data.servers.ServerManager
 import io.homeassistant.companion.android.common.data.websocket.WebSocketCore
 import io.homeassistant.companion.android.common.data.websocket.WebSocketRepository
@@ -51,18 +53,25 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.WebSocketListener
+import timber.log.Timber
 
 private val matterTimeout = 2.minutes
 
 private const val PHONE_ASSIST_TOOLS_DOMAIN = "phone_assist_tools"
 private const val PHONE_ASSIST_TOOLS_ACKNOWLEDGE_SERVICE = "acknowledge"
+private const val PERSONAL_DATA_CHALLENGE = "phone_assist_tools/personal_data/challenge"
+private const val PERSONAL_DATA_AUTHORIZE = "phone_assist_tools/personal_data/authorize"
+private const val PERSONAL_DATA_CANONICAL_PREFIX = "phone_assist_tools:v1"
 
 class WebSocketRepositoryImpl internal constructor(
     private val webSocketCore: WebSocketCore,
     private val serverManager: ServerManager,
+    private val prefsRepository: PrefsRepository? = null,
 ) : WebSocketListener(),
     WebSocketRepository {
 
@@ -275,6 +284,7 @@ class WebSocketRepositoryImpl internal constructor(
         pipelineId: String?,
         conversationId: String?,
     ): Flow<AssistPipelineEvent>? {
+        preparePersonalDataGrant()
         val data = buildMap {
             put("start_stage", "intent")
             put("end_stage", "intent")
@@ -297,6 +307,7 @@ class WebSocketRepositoryImpl internal constructor(
         conversationId: String?,
         wakeWordPhrase: String?,
     ): Flow<AssistPipelineEvent>? {
+        preparePersonalDataGrant()
         val data = buildMap {
             put("start_stage", "stt")
             put("end_stage", if (outputTts) "tts" else "intent")
@@ -319,6 +330,41 @@ class WebSocketRepositoryImpl internal constructor(
 
     override suspend fun sendVoiceData(binaryHandlerId: Int, data: ByteArray): Boolean =
         webSocketCore.sendBytes(byteArrayOf(binaryHandlerId.toByte()) + data)
+
+    /** Best-effort authorization: failures safely leave personal tools unavailable. */
+    private suspend fun preparePersonalDataGrant() {
+        val prefs = prefsRepository ?: return
+        if (!prefs.isAssistGmailReadEnabled() && !prefs.isAssistDriveReadEnabled()) return
+        val webhookId = webSocketCore.server()?.connection?.webhookId ?: return
+
+        try {
+            val challengeResponse = webSocketCore.sendMessage(
+                mapOf(
+                    "type" to PERSONAL_DATA_CHALLENGE,
+                    "webhook_id" to webhookId,
+                ),
+            )
+            if (challengeResponse?.success != true) return
+            val challengeResult = challengeResponse.result as? JsonObject ?: return
+            val challengeId = challengeResult["challenge_id"]?.jsonPrimitive?.contentOrNull ?: return
+            val nonce = challengeResult["nonce"]?.jsonPrimitive?.contentOrNull ?: return
+            val canonical = "$PERSONAL_DATA_CANONICAL_PREFIX:$challengeId:$nonce:$webhookId"
+            val signature = PersonalDataKeyManager.signBase64(canonical)
+            val authorizeResponse = webSocketCore.sendMessage(
+                mapOf(
+                    "type" to PERSONAL_DATA_AUTHORIZE,
+                    "webhook_id" to webhookId,
+                    "challenge_id" to challengeId,
+                    "signature" to signature,
+                ),
+            )
+            if (authorizeResponse?.success != true) {
+                Timber.w("Home Assistant rejected phone personal-data authorization")
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "Unable to authorize phone personal-data tools")
+        }
+    }
 
     override suspend fun getStateChanges(): Flow<StateChangedEvent>? = subscribeToEventsForType(EVENT_STATE_CHANGED)
 

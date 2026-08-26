@@ -1,5 +1,6 @@
 package io.homeassistant.companion.android.common.data.integration.impl
 
+import io.homeassistant.companion.android.common.assist.PersonalDataKeyManager
 import io.homeassistant.companion.android.common.data.HomeAssistantVersion
 import io.homeassistant.companion.android.common.data.LocalStorage
 import io.homeassistant.companion.android.common.data.integration.DeviceRegistration
@@ -27,8 +28,10 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
+import io.mockk.mockkObject
 import io.mockk.slot
 import io.mockk.spyk
+import io.mockk.unmockkObject
 import java.time.LocalDateTime
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -248,6 +251,29 @@ class IntegrationRepositoryImplTest {
 
             val request = requestSlot.captured as RegisterDeviceIntegrationRequest
             assertEquals(emptyList<String>(), request.data.appData?.get("supported_device_commands"))
+            assertEquals(emptyList<String>(), request.data.appData?.get("assist_personal_data_scopes"))
+        }
+
+        @Test
+        fun `Given personal reads enabled when updating registration then advertise scopes and public key`() = runTest {
+            val requestSlot = slot<IntegrationRequest>()
+            coEvery { integrationService.callWebhook(any(), capture(requestSlot)) } returns
+                Response.success("content".toResponseBody())
+            coEvery { localStorage.getString(any()) } returns null
+            coEvery { prefsRepository.isAssistGmailReadEnabled() } returns true
+            coEvery { prefsRepository.isAssistDriveReadEnabled() } returns true
+            mockkObject(PersonalDataKeyManager)
+            coEvery { PersonalDataKeyManager.publicKeyBase64() } returns "public-key"
+
+            try {
+                repository.updateRegistration(DeviceRegistration())
+            } finally {
+                unmockkObject(PersonalDataKeyManager)
+            }
+
+            val appData = (requestSlot.captured as RegisterDeviceIntegrationRequest).data.appData
+            assertEquals(listOf("gmail_readonly", "drive_readonly"), appData?.get("assist_personal_data_scopes"))
+            assertEquals("public-key", appData?.get("assist_personal_data_public_key"))
         }
 
         @Test

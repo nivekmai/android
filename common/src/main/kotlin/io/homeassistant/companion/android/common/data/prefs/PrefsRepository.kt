@@ -222,6 +222,18 @@ interface PrefsRepository {
     /** Sets whether Assist may start or resume media on this device. */
     suspend fun setAssistMediaControlEnabled(enabled: Boolean)
 
+    /** Returns whether phone-authorized Assist may read the connected Gmail account. */
+    suspend fun isAssistGmailReadEnabled(): Boolean
+
+    /** Enables or disables phone-authorized read-only Gmail tools. */
+    suspend fun setAssistGmailReadEnabled(enabled: Boolean)
+
+    /** Returns whether phone-authorized Assist may read the connected Google Drive. */
+    suspend fun isAssistDriveReadEnabled(): Boolean
+
+    /** Enables or disables phone-authorized read-only Google Drive tools. */
+    suspend fun setAssistDriveReadEnabled(enabled: Boolean)
+
     suspend fun addAllowedTag(tag: String)
 
     suspend fun getAllowedTags(): Set<String>

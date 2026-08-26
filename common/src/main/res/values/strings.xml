@@ -1261,6 +1261,10 @@
     <string name="assist_phone_controls_alarms">Create alarms</string>
     <string name="assist_phone_controls_timers">Create timers</string>
     <string name="assist_phone_controls_media">Play music and audiobooks</string>
+    <string name="assist_personal_data_title">Personal data</string>
+    <string name="assist_personal_data_summary">Allow only Assist sessions started on this phone to read the selected services. The phone signs a fresh, short-lived authorization for each session. Google access must also be connected in the Phone Assist Tools integration.</string>
+    <string name="assist_personal_data_gmail">Read Gmail</string>
+    <string name="assist_personal_data_drive">Read Google Drive</string>
     <string name="assist_wake_word_title">Wake word</string>
     <string name="assist_wake_word_enable">Enable wake word detection</string>
     <string name="assist_wake_word_model">Wake word</string>

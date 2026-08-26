@@ -4,6 +4,7 @@ import androidx.annotation.VisibleForTesting
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import io.homeassistant.companion.android.common.BuildConfig
+import io.homeassistant.companion.android.common.assist.PersonalDataKeyManager
 import io.homeassistant.companion.android.common.data.HomeAssistantVersion
 import io.homeassistant.companion.android.common.data.LocalStorage
 import io.homeassistant.companion.android.common.data.integration.Action
@@ -91,6 +92,10 @@ class IntegrationRepositoryImpl @AssistedInject constructor(
         private const val APP_NAME = "Home Assistant"
         private const val OS_NAME = "Android"
         private const val APP_DATA_SUPPORTED_DEVICE_COMMANDS = "supported_device_commands"
+        private const val APP_DATA_PERSONAL_DATA_PUBLIC_KEY = "assist_personal_data_public_key"
+        private const val APP_DATA_PERSONAL_DATA_SCOPES = "assist_personal_data_scopes"
+        private const val PERSONAL_DATA_SCOPE_GMAIL = "gmail_readonly"
+        private const val PERSONAL_DATA_SCOPE_DRIVE = "drive_readonly"
 
         // Note: _not_ server-specific
         private const val PREF_APP_VERSION = "app_version"
@@ -728,6 +733,16 @@ class IntegrationRepositoryImpl @AssistedInject constructor(
                 if (prefsRepository.isAssistTimerControlEnabled()) add(DeviceCommandData.COMMAND_TIMER)
                 if (prefsRepository.isAssistMediaControlEnabled()) add(DeviceCommandData.COMMAND_PLAY_MEDIA)
             }
+        }
+        val personalDataScopes = buildList {
+            if (isTrusted()) {
+                if (prefsRepository.isAssistGmailReadEnabled()) add(PERSONAL_DATA_SCOPE_GMAIL)
+                if (prefsRepository.isAssistDriveReadEnabled()) add(PERSONAL_DATA_SCOPE_DRIVE)
+            }
+        }
+        appData[APP_DATA_PERSONAL_DATA_SCOPES] = personalDataScopes
+        if (personalDataScopes.isNotEmpty()) {
+            appData[APP_DATA_PERSONAL_DATA_PUBLIC_KEY] = PersonalDataKeyManager.publicKeyBase64()
         }
         if (!pushToken.isNullOrBlank()) {
             appData["push_url"] = PUSH_URL
