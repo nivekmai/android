@@ -80,6 +80,14 @@ interface AssistConfigManager {
 
     /** Enables or disables media playback and updates every server registration. */
     suspend fun setMediaControlEnabled(enabled: Boolean)
+
+    suspend fun isGmailReadEnabled(): Boolean
+
+    suspend fun setGmailReadEnabled(enabled: Boolean)
+
+    suspend fun isDriveReadEnabled(): Boolean
+
+    suspend fun setDriveReadEnabled(enabled: Boolean)
 }
 
 class AssistConfigManagerImpl @Inject constructor(
@@ -155,6 +163,22 @@ class AssistConfigManagerImpl @Inject constructor(
     override suspend fun setMediaControlEnabled(enabled: Boolean) {
         updatePhoneControlSettings {
             prefsRepository.setAssistMediaControlEnabled(enabled)
+        }
+    }
+
+    override suspend fun isGmailReadEnabled(): Boolean = prefsRepository.isAssistGmailReadEnabled()
+
+    override suspend fun setGmailReadEnabled(enabled: Boolean) {
+        updatePhoneControlSettings {
+            prefsRepository.setAssistGmailReadEnabled(enabled)
+        }
+    }
+
+    override suspend fun isDriveReadEnabled(): Boolean = prefsRepository.isAssistDriveReadEnabled()
+
+    override suspend fun setDriveReadEnabled(enabled: Boolean) {
+        updatePhoneControlSettings {
+            prefsRepository.setAssistDriveReadEnabled(enabled)
         }
     }
 

@@ -1,5 +1,7 @@
 package io.homeassistant.companion.android.common.data.websocket.impl
 
+import io.homeassistant.companion.android.common.assist.PersonalDataKeyManager
+import io.homeassistant.companion.android.common.data.prefs.PrefsRepository
 import io.homeassistant.companion.android.common.data.servers.ServerManager
 import io.homeassistant.companion.android.common.data.websocket.WebSocketCore
 import io.homeassistant.companion.android.common.data.websocket.impl.WebSocketConstants.SUBSCRIBE_TYPE_ASSIST_PIPELINE_RUN
@@ -15,6 +17,7 @@ import io.mockk.CapturingSlot
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.mockkObject
 import io.mockk.slot
 import io.mockk.unmockkAll
 import kotlinx.coroutines.flow.emptyFlow
@@ -230,6 +233,53 @@ class WebSocketRepositoryImplTest {
             )
 
             assertEquals("stt", dataSlot.captured["start_stage"])
+        }
+    }
+
+    @Nested
+    inner class PersonalDataAuthorization {
+
+        @Test
+        fun `Given personal read enabled when running pipeline then sign a server challenge first`() = runTest {
+            val prefsRepository = mockk<PrefsRepository>(relaxed = true)
+            coEvery { prefsRepository.isAssistGmailReadEnabled() } returns true
+            coEvery { prefsRepository.isAssistDriveReadEnabled() } returns false
+            repository = WebSocketRepositoryImpl(webSocketCore, serverManager, prefsRepository)
+            coEvery { webSocketCore.server() } returns createServer(deviceRegistryId = "device-123")
+            val messages = mutableListOf<Map<String, Any?>>()
+            coEvery { webSocketCore.sendMessage(capture(messages)) } returnsMany
+                listOf(
+                    MessageSocketResponse(
+                        success = true,
+                        result = kotlinJsonMapper.parseToJsonElement(
+                            """{"challenge_id":"challenge-1","nonce":"nonce-1"}""",
+                        ),
+                    ),
+                    MessageSocketResponse(success = true),
+                )
+            coEvery {
+                webSocketCore.subscribeTo<AssistPipelineEvent>(any(), any(), any())
+            } returns emptyFlow()
+            mockkObject(PersonalDataKeyManager)
+            coEvery { PersonalDataKeyManager.signBase64(any()) } returns "signature-1"
+
+            repository.runAssistPipelineForVoice(
+                sampleRate = VOICE_SAMPLE_RATE,
+                outputTts = true,
+                pipelineId = null,
+                conversationId = null,
+                wakeWordPhrase = null,
+            )
+
+            assertEquals("phone_assist_tools/personal_data/challenge", messages[0]["type"])
+            assertEquals("webhook_id", messages[0]["webhook_id"])
+            assertEquals("phone_assist_tools/personal_data/authorize", messages[1]["type"])
+            assertEquals("signature-1", messages[1]["signature"])
+            coVerify {
+                PersonalDataKeyManager.signBase64(
+                    "phone_assist_tools:v1:challenge-1:nonce-1:webhook_id",
+                )
+            }
         }
     }
 

@@ -2,6 +2,7 @@
 <changelog xmlns:tools="http://schemas.android.com/tools"
     tools:ignore="MissingDefaultResource">
     <release version="2026.8.4 - Main" versioncode="3">
+        <change>Add phone-signed, read-only Gmail and Google Drive Assist access</change>
         <change>Debug prototype uses the established ACTION_ASSIST activity path for system assistant launches</change>
         <change>You can now choose whether Assist may create alarms and timers in this device's Clock app</change>
         <change>Assist can now resume audiobooks and play music through compatible phone media apps</change>
