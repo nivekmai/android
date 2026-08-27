@@ -257,11 +257,15 @@ class AssistConfigManagerTest {
             coEvery { prefsRepository.isAssistTimerControlEnabled() } returns false
             coEvery { prefsRepository.isAssistMediaControlEnabled() } returns true
             coEvery { prefsRepository.isAssistCalendarWriteEnabled() } returns true
+            coEvery { prefsRepository.isAssistGmailWriteEnabled() } returns true
+            coEvery { prefsRepository.isAssistDriveWriteEnabled() } returns false
 
             assertTrue(manager.isAlarmControlEnabled())
             assertFalse(manager.isTimerControlEnabled())
             assertTrue(manager.isMediaControlEnabled())
             assertTrue(manager.isCalendarWriteEnabled())
+            assertTrue(manager.isGmailWriteEnabled())
+            assertFalse(manager.isDriveWriteEnabled())
         }
 
         @Test
@@ -274,6 +278,20 @@ class AssistConfigManagerTest {
             manager.setCalendarWriteEnabled(true)
 
             coVerify { prefsRepository.setAssistCalendarWriteEnabled(true) }
+            coVerify { repository.updateRegistration(any()) }
+            verify { workManager.enqueue(any<OneTimeWorkRequest>()) }
+        }
+
+        @Test
+        fun `Given Gmail write changed when saving then persist and update registrations`() = runTest {
+            val server = mockk<Server> { every { id } returns 1 }
+            val repository = mockk<IntegrationRepository>(relaxed = true)
+            coEvery { serverManager.servers() } returns listOf(server)
+            coEvery { serverManager.integrationRepository(1) } returns repository
+
+            manager.setGmailWriteEnabled(true)
+
+            coVerify { prefsRepository.setAssistGmailWriteEnabled(true) }
             coVerify { repository.updateRegistration(any()) }
             verify { workManager.enqueue(any<OneTimeWorkRequest>()) }
         }

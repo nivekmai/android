@@ -337,7 +337,9 @@ class WebSocketRepositoryImpl internal constructor(
         if (
             !prefs.isAssistGmailReadEnabled() &&
             !prefs.isAssistDriveReadEnabled() &&
-            !prefs.isAssistCalendarWriteEnabled()
+            !prefs.isAssistCalendarWriteEnabled() &&
+            !prefs.isAssistGmailWriteEnabled() &&
+            !prefs.isAssistDriveWriteEnabled()
         ) {
             return
         }

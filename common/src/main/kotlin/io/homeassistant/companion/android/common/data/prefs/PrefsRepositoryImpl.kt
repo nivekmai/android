@@ -51,6 +51,8 @@ private const val PREF_ASSIST_MEDIA_CONTROL_ENABLED = "assist_media_control_enab
 private const val PREF_ASSIST_GMAIL_READ_ENABLED = "assist_gmail_read_enabled"
 private const val PREF_ASSIST_DRIVE_READ_ENABLED = "assist_drive_read_enabled"
 private const val PREF_ASSIST_CALENDAR_WRITE_ENABLED = "assist_calendar_write_enabled"
+private const val PREF_ASSIST_GMAIL_WRITE_ENABLED = "assist_gmail_write_enabled"
+private const val PREF_ASSIST_DRIVE_WRITE_ENABLED = "assist_drive_write_enabled"
 private const val PREF_ALLOWED_TAGS = "allowed_tags"
 
 /**
@@ -496,6 +498,22 @@ internal class PrefsRepositoryImpl @Inject constructor(
 
     override suspend fun setAssistCalendarWriteEnabled(enabled: Boolean) {
         localStorage().putBoolean(PREF_ASSIST_CALENDAR_WRITE_ENABLED, enabled)
+    }
+
+    override suspend fun isAssistGmailWriteEnabled(): Boolean {
+        return localStorage().getBooleanOrNull(PREF_ASSIST_GMAIL_WRITE_ENABLED) ?: false
+    }
+
+    override suspend fun setAssistGmailWriteEnabled(enabled: Boolean) {
+        localStorage().putBoolean(PREF_ASSIST_GMAIL_WRITE_ENABLED, enabled)
+    }
+
+    override suspend fun isAssistDriveWriteEnabled(): Boolean {
+        return localStorage().getBooleanOrNull(PREF_ASSIST_DRIVE_WRITE_ENABLED) ?: false
+    }
+
+    override suspend fun setAssistDriveWriteEnabled(enabled: Boolean) {
+        localStorage().putBoolean(PREF_ASSIST_DRIVE_WRITE_ENABLED, enabled)
     }
 
     override suspend fun addAllowedTag(tag: String) {

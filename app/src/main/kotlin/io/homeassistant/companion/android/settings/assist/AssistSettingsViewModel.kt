@@ -29,6 +29,8 @@ data class AssistSettingsUiState(
     val isGmailReadEnabled: Boolean = false,
     val isDriveReadEnabled: Boolean = false,
     val isCalendarWriteEnabled: Boolean = false,
+    val isGmailWriteEnabled: Boolean = false,
+    val isDriveWriteEnabled: Boolean = false,
     val isWakeWordEnabled: Boolean = false,
     val selectedWakeWordModel: MicroWakeWordModelConfig? = null,
     val availableModels: List<MicroWakeWordModelConfig> = emptyList(),
@@ -66,6 +68,8 @@ class AssistSettingsViewModel @Inject internal constructor(
             val isGmailReadEnabled = assistConfigManager.isGmailReadEnabled()
             val isDriveReadEnabled = assistConfigManager.isDriveReadEnabled()
             val isCalendarWriteEnabled = assistConfigManager.isCalendarWriteEnabled()
+            val isGmailWriteEnabled = assistConfigManager.isGmailWriteEnabled()
+            val isDriveWriteEnabled = assistConfigManager.isDriveWriteEnabled()
 
             if (!isDefaultAssistant && isEnabled) {
                 assistConfigManager.setWakeWordEnabled(false)
@@ -82,6 +86,8 @@ class AssistSettingsViewModel @Inject internal constructor(
                     isGmailReadEnabled = isGmailReadEnabled,
                     isDriveReadEnabled = isDriveReadEnabled,
                     isCalendarWriteEnabled = isCalendarWriteEnabled,
+                    isGmailWriteEnabled = isGmailWriteEnabled,
+                    isDriveWriteEnabled = isDriveWriteEnabled,
                     isWakeWordEnabled = isEnabled,
                     selectedWakeWordModel = selectedModel,
                     availableModels = models,
@@ -159,6 +165,16 @@ class AssistSettingsViewModel @Inject internal constructor(
     fun onToggleCalendarWrite(enabled: Boolean) {
         _uiState.update { it.copy(isCalendarWriteEnabled = enabled) }
         viewModelScope.launch { assistConfigManager.setCalendarWriteEnabled(enabled) }
+    }
+
+    fun onToggleGmailWrite(enabled: Boolean) {
+        _uiState.update { it.copy(isGmailWriteEnabled = enabled) }
+        viewModelScope.launch { assistConfigManager.setGmailWriteEnabled(enabled) }
+    }
+
+    fun onToggleDriveWrite(enabled: Boolean) {
+        _uiState.update { it.copy(isDriveWriteEnabled = enabled) }
+        viewModelScope.launch { assistConfigManager.setDriveWriteEnabled(enabled) }
     }
 
     /**

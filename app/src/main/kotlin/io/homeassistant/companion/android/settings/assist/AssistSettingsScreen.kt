@@ -154,6 +154,8 @@ fun AssistSettingsScreen(viewModel: AssistSettingsViewModel, modifier: Modifier 
             onToggleGmailRead = viewModel::onToggleGmailRead,
             onToggleDriveRead = viewModel::onToggleDriveRead,
             onToggleCalendarWrite = viewModel::onToggleCalendarWrite,
+            onToggleGmailWrite = viewModel::onToggleGmailWrite,
+            onToggleDriveWrite = viewModel::onToggleDriveWrite,
             onSelectWakeWord = viewModel::onSelectWakeWordModel,
             onStartTestWakeWord = { viewModel.setTestingWakeWord(true) },
             onStopTestWakeWord = { viewModel.setTestingWakeWord(false) },
@@ -175,6 +177,8 @@ internal fun AssistSettingsContent(
     onToggleGmailRead: (Boolean) -> Unit = {},
     onToggleDriveRead: (Boolean) -> Unit = {},
     onToggleCalendarWrite: (Boolean) -> Unit = {},
+    onToggleGmailWrite: (Boolean) -> Unit = {},
+    onToggleDriveWrite: (Boolean) -> Unit = {},
     onSelectWakeWord: (MicroWakeWordModelConfig) -> Unit,
     onStartTestWakeWord: () -> Unit,
     onStopTestWakeWord: () -> Unit,
@@ -229,9 +233,13 @@ internal fun AssistSettingsContent(
                 gmailEnabled = uiState.isGmailReadEnabled,
                 driveEnabled = uiState.isDriveReadEnabled,
                 calendarEnabled = uiState.isCalendarWriteEnabled,
+                gmailWriteEnabled = uiState.isGmailWriteEnabled,
+                driveWriteEnabled = uiState.isDriveWriteEnabled,
                 onToggleGmail = onToggleGmailRead,
                 onToggleDrive = onToggleDriveRead,
                 onToggleCalendar = onToggleCalendarWrite,
+                onToggleGmailWrite = onToggleGmailWrite,
+                onToggleDriveWrite = onToggleDriveWrite,
             )
             HAHint(
                 text = stringResource(commonR.string.assist_personal_data_summary),
@@ -315,9 +323,13 @@ private fun PersonalDataCard(
     gmailEnabled: Boolean,
     driveEnabled: Boolean,
     calendarEnabled: Boolean,
+    gmailWriteEnabled: Boolean,
+    driveWriteEnabled: Boolean,
     onToggleGmail: (Boolean) -> Unit,
     onToggleDrive: (Boolean) -> Unit,
     onToggleCalendar: (Boolean) -> Unit,
+    onToggleGmailWrite: (Boolean) -> Unit,
+    onToggleDriveWrite: (Boolean) -> Unit,
 ) {
     HASettingsCard {
         Column(verticalArrangement = Arrangement.spacedBy(HADimens.SPACE4)) {
@@ -335,6 +347,16 @@ private fun PersonalDataCard(
                 label = stringResource(commonR.string.assist_personal_data_calendar),
                 enabled = calendarEnabled,
                 onToggle = onToggleCalendar,
+            )
+            PhoneControlToggleRow(
+                label = stringResource(commonR.string.assist_personal_data_gmail_write),
+                enabled = gmailWriteEnabled,
+                onToggle = onToggleGmailWrite,
+            )
+            PhoneControlToggleRow(
+                label = stringResource(commonR.string.assist_personal_data_drive_write),
+                enabled = driveWriteEnabled,
+                onToggle = onToggleDriveWrite,
             )
         }
     }

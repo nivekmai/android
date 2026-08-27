@@ -97,6 +97,8 @@ class IntegrationRepositoryImpl @AssistedInject constructor(
         private const val PERSONAL_DATA_SCOPE_GMAIL = "gmail_readonly"
         private const val PERSONAL_DATA_SCOPE_DRIVE = "drive_readonly"
         private const val PERSONAL_DATA_SCOPE_CALENDAR = "calendar_events_readwrite"
+        private const val PERSONAL_DATA_SCOPE_GMAIL_WRITE = "gmail_write"
+        private const val PERSONAL_DATA_SCOPE_DRIVE_WRITE = "drive_docs_write"
 
         // Note: _not_ server-specific
         private const val PREF_APP_VERSION = "app_version"
@@ -740,6 +742,8 @@ class IntegrationRepositoryImpl @AssistedInject constructor(
                 if (prefsRepository.isAssistGmailReadEnabled()) add(PERSONAL_DATA_SCOPE_GMAIL)
                 if (prefsRepository.isAssistDriveReadEnabled()) add(PERSONAL_DATA_SCOPE_DRIVE)
                 if (prefsRepository.isAssistCalendarWriteEnabled()) add(PERSONAL_DATA_SCOPE_CALENDAR)
+                if (prefsRepository.isAssistGmailWriteEnabled()) add(PERSONAL_DATA_SCOPE_GMAIL_WRITE)
+                if (prefsRepository.isAssistDriveWriteEnabled()) add(PERSONAL_DATA_SCOPE_DRIVE_WRITE)
             }
         }
         appData[APP_DATA_PERSONAL_DATA_SCOPES] = personalDataScopes

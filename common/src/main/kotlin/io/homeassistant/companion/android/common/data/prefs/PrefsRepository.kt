@@ -240,6 +240,18 @@ interface PrefsRepository {
     /** Enables or disables phone-authorized Google Calendar event read/write tools. */
     suspend fun setAssistCalendarWriteEnabled(enabled: Boolean)
 
+    /** Returns whether phone-authorized Assist may write Gmail without permanent deletion. */
+    suspend fun isAssistGmailWriteEnabled(): Boolean
+
+    /** Enables Gmail draft, send, and reversible mailbox tools. */
+    suspend fun setAssistGmailWriteEnabled(enabled: Boolean)
+
+    /** Returns whether phone-authorized Assist may write Drive and Google Docs. */
+    suspend fun isAssistDriveWriteEnabled(): Boolean
+
+    /** Enables constrained Drive and Google Docs write tools. */
+    suspend fun setAssistDriveWriteEnabled(enabled: Boolean)
+
     suspend fun addAllowedTag(tag: String)
 
     suspend fun getAllowedTags(): Set<String>

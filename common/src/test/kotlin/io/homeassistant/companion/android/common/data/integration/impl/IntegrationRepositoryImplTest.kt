@@ -263,6 +263,8 @@ class IntegrationRepositoryImplTest {
             coEvery { prefsRepository.isAssistGmailReadEnabled() } returns true
             coEvery { prefsRepository.isAssistDriveReadEnabled() } returns true
             coEvery { prefsRepository.isAssistCalendarWriteEnabled() } returns true
+            coEvery { prefsRepository.isAssistGmailWriteEnabled() } returns true
+            coEvery { prefsRepository.isAssistDriveWriteEnabled() } returns true
             mockkObject(PersonalDataKeyManager)
             coEvery { PersonalDataKeyManager.publicKeyBase64() } returns "public-key"
 
@@ -274,7 +276,13 @@ class IntegrationRepositoryImplTest {
 
             val appData = (requestSlot.captured as RegisterDeviceIntegrationRequest).data.appData
             assertEquals(
-                listOf("gmail_readonly", "drive_readonly", "calendar_events_readwrite"),
+                listOf(
+                    "gmail_readonly",
+                    "drive_readonly",
+                    "calendar_events_readwrite",
+                    "gmail_write",
+                    "drive_docs_write",
+                ),
                 appData?.get("assist_personal_data_scopes"),
             )
             assertEquals("public-key", appData?.get("assist_personal_data_public_key"))

@@ -41,6 +41,8 @@ class AssistSettingsViewModelTest {
         coEvery { assistConfigManager.isGmailReadEnabled() } returns false
         coEvery { assistConfigManager.isDriveReadEnabled() } returns false
         coEvery { assistConfigManager.isCalendarWriteEnabled() } returns false
+        coEvery { assistConfigManager.isGmailWriteEnabled() } returns false
+        coEvery { assistConfigManager.isDriveWriteEnabled() } returns false
         coEvery { assistConfigManager.getSelectedWakeWordModel() } returns microWakeWordModelConfigs[0]
         every { defaultAssistantManager.isDefaultAssistant() } returns true
     }
@@ -293,6 +295,30 @@ class AssistSettingsViewModelTest {
 
             assertTrue(viewModel.uiState.value.isCalendarWriteEnabled)
             coVerify { assistConfigManager.setCalendarWriteEnabled(true) }
+        }
+
+        @Test
+        fun `Given Gmail write disabled when toggled then enable and save`() = runTest {
+            viewModel = createViewModel()
+            runCurrent()
+
+            viewModel.onToggleGmailWrite(true)
+            runCurrent()
+
+            assertTrue(viewModel.uiState.value.isGmailWriteEnabled)
+            coVerify { assistConfigManager.setGmailWriteEnabled(true) }
+        }
+
+        @Test
+        fun `Given Drive write disabled when toggled then enable and save`() = runTest {
+            viewModel = createViewModel()
+            runCurrent()
+
+            viewModel.onToggleDriveWrite(true)
+            runCurrent()
+
+            assertTrue(viewModel.uiState.value.isDriveWriteEnabled)
+            coVerify { assistConfigManager.setDriveWriteEnabled(true) }
         }
     }
 

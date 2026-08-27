@@ -92,6 +92,14 @@ interface AssistConfigManager {
     suspend fun isCalendarWriteEnabled(): Boolean
 
     suspend fun setCalendarWriteEnabled(enabled: Boolean)
+
+    suspend fun isGmailWriteEnabled(): Boolean
+
+    suspend fun setGmailWriteEnabled(enabled: Boolean)
+
+    suspend fun isDriveWriteEnabled(): Boolean
+
+    suspend fun setDriveWriteEnabled(enabled: Boolean)
 }
 
 class AssistConfigManagerImpl @Inject constructor(
@@ -191,6 +199,22 @@ class AssistConfigManagerImpl @Inject constructor(
     override suspend fun setCalendarWriteEnabled(enabled: Boolean) {
         updatePhoneControlSettings {
             prefsRepository.setAssistCalendarWriteEnabled(enabled)
+        }
+    }
+
+    override suspend fun isGmailWriteEnabled(): Boolean = prefsRepository.isAssistGmailWriteEnabled()
+
+    override suspend fun setGmailWriteEnabled(enabled: Boolean) {
+        updatePhoneControlSettings {
+            prefsRepository.setAssistGmailWriteEnabled(enabled)
+        }
+    }
+
+    override suspend fun isDriveWriteEnabled(): Boolean = prefsRepository.isAssistDriveWriteEnabled()
+
+    override suspend fun setDriveWriteEnabled(enabled: Boolean) {
+        updatePhoneControlSettings {
+            prefsRepository.setAssistDriveWriteEnabled(enabled)
         }
     }
 
