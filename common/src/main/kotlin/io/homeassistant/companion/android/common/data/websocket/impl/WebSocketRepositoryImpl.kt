@@ -334,7 +334,13 @@ class WebSocketRepositoryImpl internal constructor(
     /** Best-effort authorization: failures safely leave personal tools unavailable. */
     private suspend fun preparePersonalDataGrant() {
         val prefs = prefsRepository ?: return
-        if (!prefs.isAssistGmailReadEnabled() && !prefs.isAssistDriveReadEnabled()) return
+        if (
+            !prefs.isAssistGmailReadEnabled() &&
+            !prefs.isAssistDriveReadEnabled() &&
+            !prefs.isAssistCalendarWriteEnabled()
+        ) {
+            return
+        }
         val webhookId = webSocketCore.server()?.connection?.webhookId ?: return
 
         try {

@@ -153,6 +153,7 @@ fun AssistSettingsScreen(viewModel: AssistSettingsViewModel, modifier: Modifier 
             },
             onToggleGmailRead = viewModel::onToggleGmailRead,
             onToggleDriveRead = viewModel::onToggleDriveRead,
+            onToggleCalendarWrite = viewModel::onToggleCalendarWrite,
             onSelectWakeWord = viewModel::onSelectWakeWordModel,
             onStartTestWakeWord = { viewModel.setTestingWakeWord(true) },
             onStopTestWakeWord = { viewModel.setTestingWakeWord(false) },
@@ -173,6 +174,7 @@ internal fun AssistSettingsContent(
     onToggleMediaControl: (Boolean) -> Unit = {},
     onToggleGmailRead: (Boolean) -> Unit = {},
     onToggleDriveRead: (Boolean) -> Unit = {},
+    onToggleCalendarWrite: (Boolean) -> Unit = {},
     onSelectWakeWord: (MicroWakeWordModelConfig) -> Unit,
     onStartTestWakeWord: () -> Unit,
     onStopTestWakeWord: () -> Unit,
@@ -226,8 +228,10 @@ internal fun AssistSettingsContent(
             PersonalDataCard(
                 gmailEnabled = uiState.isGmailReadEnabled,
                 driveEnabled = uiState.isDriveReadEnabled,
+                calendarEnabled = uiState.isCalendarWriteEnabled,
                 onToggleGmail = onToggleGmailRead,
                 onToggleDrive = onToggleDriveRead,
+                onToggleCalendar = onToggleCalendarWrite,
             )
             HAHint(
                 text = stringResource(commonR.string.assist_personal_data_summary),
@@ -310,8 +314,10 @@ private fun PhoneControlToggleRow(label: String, enabled: Boolean, onToggle: (Bo
 private fun PersonalDataCard(
     gmailEnabled: Boolean,
     driveEnabled: Boolean,
+    calendarEnabled: Boolean,
     onToggleGmail: (Boolean) -> Unit,
     onToggleDrive: (Boolean) -> Unit,
+    onToggleCalendar: (Boolean) -> Unit,
 ) {
     HASettingsCard {
         Column(verticalArrangement = Arrangement.spacedBy(HADimens.SPACE4)) {
@@ -324,6 +330,11 @@ private fun PersonalDataCard(
                 label = stringResource(commonR.string.assist_personal_data_drive),
                 enabled = driveEnabled,
                 onToggle = onToggleDrive,
+            )
+            PhoneControlToggleRow(
+                label = stringResource(commonR.string.assist_personal_data_calendar),
+                enabled = calendarEnabled,
+                onToggle = onToggleCalendar,
             )
         }
     }

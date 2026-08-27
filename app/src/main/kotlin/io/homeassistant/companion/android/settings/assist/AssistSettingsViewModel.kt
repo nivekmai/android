@@ -28,6 +28,7 @@ data class AssistSettingsUiState(
     val isMediaControlEnabled: Boolean = false,
     val isGmailReadEnabled: Boolean = false,
     val isDriveReadEnabled: Boolean = false,
+    val isCalendarWriteEnabled: Boolean = false,
     val isWakeWordEnabled: Boolean = false,
     val selectedWakeWordModel: MicroWakeWordModelConfig? = null,
     val availableModels: List<MicroWakeWordModelConfig> = emptyList(),
@@ -64,6 +65,7 @@ class AssistSettingsViewModel @Inject internal constructor(
             val isMediaControlEnabled = assistConfigManager.isMediaControlEnabled()
             val isGmailReadEnabled = assistConfigManager.isGmailReadEnabled()
             val isDriveReadEnabled = assistConfigManager.isDriveReadEnabled()
+            val isCalendarWriteEnabled = assistConfigManager.isCalendarWriteEnabled()
 
             if (!isDefaultAssistant && isEnabled) {
                 assistConfigManager.setWakeWordEnabled(false)
@@ -79,6 +81,7 @@ class AssistSettingsViewModel @Inject internal constructor(
                     isMediaControlEnabled = isMediaControlEnabled,
                     isGmailReadEnabled = isGmailReadEnabled,
                     isDriveReadEnabled = isDriveReadEnabled,
+                    isCalendarWriteEnabled = isCalendarWriteEnabled,
                     isWakeWordEnabled = isEnabled,
                     selectedWakeWordModel = selectedModel,
                     availableModels = models,
@@ -151,6 +154,11 @@ class AssistSettingsViewModel @Inject internal constructor(
     fun onToggleDriveRead(enabled: Boolean) {
         _uiState.update { it.copy(isDriveReadEnabled = enabled) }
         viewModelScope.launch { assistConfigManager.setDriveReadEnabled(enabled) }
+    }
+
+    fun onToggleCalendarWrite(enabled: Boolean) {
+        _uiState.update { it.copy(isCalendarWriteEnabled = enabled) }
+        viewModelScope.launch { assistConfigManager.setCalendarWriteEnabled(enabled) }
     }
 
     /**

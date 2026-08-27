@@ -88,6 +88,10 @@ interface AssistConfigManager {
     suspend fun isDriveReadEnabled(): Boolean
 
     suspend fun setDriveReadEnabled(enabled: Boolean)
+
+    suspend fun isCalendarWriteEnabled(): Boolean
+
+    suspend fun setCalendarWriteEnabled(enabled: Boolean)
 }
 
 class AssistConfigManagerImpl @Inject constructor(
@@ -179,6 +183,14 @@ class AssistConfigManagerImpl @Inject constructor(
     override suspend fun setDriveReadEnabled(enabled: Boolean) {
         updatePhoneControlSettings {
             prefsRepository.setAssistDriveReadEnabled(enabled)
+        }
+    }
+
+    override suspend fun isCalendarWriteEnabled(): Boolean = prefsRepository.isAssistCalendarWriteEnabled()
+
+    override suspend fun setCalendarWriteEnabled(enabled: Boolean) {
+        updatePhoneControlSettings {
+            prefsRepository.setAssistCalendarWriteEnabled(enabled)
         }
     }
 

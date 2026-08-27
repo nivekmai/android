@@ -234,6 +234,12 @@ interface PrefsRepository {
     /** Enables or disables phone-authorized read-only Google Drive tools. */
     suspend fun setAssistDriveReadEnabled(enabled: Boolean)
 
+    /** Returns whether phone-authorized Assist may read and modify Google Calendar events. */
+    suspend fun isAssistCalendarWriteEnabled(): Boolean
+
+    /** Enables or disables phone-authorized Google Calendar event read/write tools. */
+    suspend fun setAssistCalendarWriteEnabled(enabled: Boolean)
+
     suspend fun addAllowedTag(tag: String)
 
     suspend fun getAllowedTags(): Set<String>

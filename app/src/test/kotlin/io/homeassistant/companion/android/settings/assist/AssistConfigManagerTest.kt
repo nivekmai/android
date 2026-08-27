@@ -256,10 +256,26 @@ class AssistConfigManagerTest {
             coEvery { prefsRepository.isAssistAlarmControlEnabled() } returns true
             coEvery { prefsRepository.isAssistTimerControlEnabled() } returns false
             coEvery { prefsRepository.isAssistMediaControlEnabled() } returns true
+            coEvery { prefsRepository.isAssistCalendarWriteEnabled() } returns true
 
             assertTrue(manager.isAlarmControlEnabled())
             assertFalse(manager.isTimerControlEnabled())
             assertTrue(manager.isMediaControlEnabled())
+            assertTrue(manager.isCalendarWriteEnabled())
+        }
+
+        @Test
+        fun `Given calendar access changed when saving then persist and update registrations`() = runTest {
+            val server = mockk<Server> { every { id } returns 1 }
+            val repository = mockk<IntegrationRepository>(relaxed = true)
+            coEvery { serverManager.servers() } returns listOf(server)
+            coEvery { serverManager.integrationRepository(1) } returns repository
+
+            manager.setCalendarWriteEnabled(true)
+
+            coVerify { prefsRepository.setAssistCalendarWriteEnabled(true) }
+            coVerify { repository.updateRegistration(any()) }
+            verify { workManager.enqueue(any<OneTimeWorkRequest>()) }
         }
 
         @Test

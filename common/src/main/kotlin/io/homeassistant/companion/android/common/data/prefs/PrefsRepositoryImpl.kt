@@ -50,6 +50,7 @@ private const val PREF_ASSIST_TIMER_CONTROL_ENABLED = "assist_timer_control_enab
 private const val PREF_ASSIST_MEDIA_CONTROL_ENABLED = "assist_media_control_enabled"
 private const val PREF_ASSIST_GMAIL_READ_ENABLED = "assist_gmail_read_enabled"
 private const val PREF_ASSIST_DRIVE_READ_ENABLED = "assist_drive_read_enabled"
+private const val PREF_ASSIST_CALENDAR_WRITE_ENABLED = "assist_calendar_write_enabled"
 private const val PREF_ALLOWED_TAGS = "allowed_tags"
 
 /**
@@ -487,6 +488,14 @@ internal class PrefsRepositoryImpl @Inject constructor(
 
     override suspend fun setAssistDriveReadEnabled(enabled: Boolean) {
         localStorage().putBoolean(PREF_ASSIST_DRIVE_READ_ENABLED, enabled)
+    }
+
+    override suspend fun isAssistCalendarWriteEnabled(): Boolean {
+        return localStorage().getBooleanOrNull(PREF_ASSIST_CALENDAR_WRITE_ENABLED) ?: false
+    }
+
+    override suspend fun setAssistCalendarWriteEnabled(enabled: Boolean) {
+        localStorage().putBoolean(PREF_ASSIST_CALENDAR_WRITE_ENABLED, enabled)
     }
 
     override suspend fun addAllowedTag(tag: String) {

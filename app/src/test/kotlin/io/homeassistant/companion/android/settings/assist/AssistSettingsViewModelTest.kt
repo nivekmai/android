@@ -38,6 +38,9 @@ class AssistSettingsViewModelTest {
         coEvery { assistConfigManager.isAlarmControlEnabled() } returns false
         coEvery { assistConfigManager.isTimerControlEnabled() } returns false
         coEvery { assistConfigManager.isMediaControlEnabled() } returns false
+        coEvery { assistConfigManager.isGmailReadEnabled() } returns false
+        coEvery { assistConfigManager.isDriveReadEnabled() } returns false
+        coEvery { assistConfigManager.isCalendarWriteEnabled() } returns false
         coEvery { assistConfigManager.getSelectedWakeWordModel() } returns microWakeWordModelConfigs[0]
         every { defaultAssistantManager.isDefaultAssistant() } returns true
     }
@@ -278,6 +281,18 @@ class AssistSettingsViewModelTest {
 
             assertTrue(viewModel.uiState.value.isMediaControlEnabled)
             coVerify { assistConfigManager.setMediaControlEnabled(true) }
+        }
+
+        @Test
+        fun `Given calendar access disabled when toggled then enable and save`() = runTest {
+            viewModel = createViewModel()
+            runCurrent()
+
+            viewModel.onToggleCalendarWrite(true)
+            runCurrent()
+
+            assertTrue(viewModel.uiState.value.isCalendarWriteEnabled)
+            coVerify { assistConfigManager.setCalendarWriteEnabled(true) }
         }
     }
 

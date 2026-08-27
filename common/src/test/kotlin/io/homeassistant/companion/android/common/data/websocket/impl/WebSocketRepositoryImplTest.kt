@@ -240,10 +240,11 @@ class WebSocketRepositoryImplTest {
     inner class PersonalDataAuthorization {
 
         @Test
-        fun `Given personal read enabled when running pipeline then sign a server challenge first`() = runTest {
+        fun `Given personal access enabled when running pipeline then sign a server challenge first`() = runTest {
             val prefsRepository = mockk<PrefsRepository>(relaxed = true)
-            coEvery { prefsRepository.isAssistGmailReadEnabled() } returns true
+            coEvery { prefsRepository.isAssistGmailReadEnabled() } returns false
             coEvery { prefsRepository.isAssistDriveReadEnabled() } returns false
+            coEvery { prefsRepository.isAssistCalendarWriteEnabled() } returns true
             repository = WebSocketRepositoryImpl(webSocketCore, serverManager, prefsRepository)
             coEvery { webSocketCore.server() } returns createServer(deviceRegistryId = "device-123")
             val messages = mutableListOf<Map<String, Any?>>()
