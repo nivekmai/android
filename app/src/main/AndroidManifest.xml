@@ -539,9 +539,9 @@
             </intent-filter>
         </activity>
 
-        <!-- Launched explicitly by AssistVoiceInteractionSession. Do not register ACTION_ASSIST
-             here: exposing both an activity and a VoiceInteractionService lets Android select the
-             legacy activity and bypass the session that handles push-to-talk key events. -->
+        <!-- Pixel System UI can keep resolving the Power-button assistant gesture through
+             ACTION_ASSIST even while this app's VoiceInteractionService is active. AssistActivity
+             relays that invocation to the active service, which then creates the voice session. -->
         <activity android:name=".assist.AssistActivity"
             android:exported="true"
             android:windowSoftInputMode="adjustResize"
@@ -549,7 +549,12 @@
             android:taskAffinity="io.homeassistant.companion.android.assist"
             android:autoRemoveFromRecents="true"
             android:showWhenLocked="true"
-            android:theme="@style/Theme.HomeAssistant.TranslucentOverlay" />
+            android:theme="@style/Theme.HomeAssistant.TranslucentOverlay">
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
         <activity-alias
             android:name=".assist.VoiceCommandIntentActivity"
             android:targetActivity=".assist.AssistActivity"

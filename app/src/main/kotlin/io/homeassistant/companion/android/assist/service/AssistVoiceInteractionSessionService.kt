@@ -3,6 +3,7 @@ package io.homeassistant.companion.android.assist.service
 import android.os.Bundle
 import android.service.voice.VoiceInteractionSession
 import android.service.voice.VoiceInteractionSessionService
+import io.homeassistant.companion.android.common.assist.AssistPushToTalkDiagnostics
 import timber.log.Timber
 
 /**
@@ -14,7 +15,15 @@ import timber.log.Timber
  */
 class AssistVoiceInteractionSessionService : VoiceInteractionSessionService() {
 
+    override fun onCreate() {
+        super.onCreate()
+        AssistPushToTalkDiagnostics.log("sessionService.onCreate")
+    }
+
     override fun onNewSession(args: Bundle?): VoiceInteractionSession {
+        AssistPushToTalkDiagnostics.log(
+            "sessionService.onNewSession argKeys=${args?.keySet()?.sorted() ?: emptyList<String>()}",
+        )
         Timber.d("Creating new VoiceInteractionSession")
         return AssistVoiceInteractionSession(applicationContext)
     }

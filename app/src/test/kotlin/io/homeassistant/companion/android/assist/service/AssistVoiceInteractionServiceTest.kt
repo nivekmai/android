@@ -7,8 +7,10 @@ import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import dagger.hilt.android.testing.HiltTestApplication
 import io.homeassistant.companion.android.assist.service.AssistVoiceInteractionService.Companion.ACTION_RESUME_LISTENING
+import io.homeassistant.companion.android.assist.service.AssistVoiceInteractionService.Companion.ACTION_SHOW_PUSH_TO_TALK_SESSION
 import io.homeassistant.companion.android.assist.service.AssistVoiceInteractionService.Companion.ACTION_START_LISTENING
 import io.homeassistant.companion.android.assist.service.AssistVoiceInteractionService.Companion.ACTION_STOP_LISTENING
+import io.homeassistant.companion.android.assist.service.AssistVoiceInteractionService.Companion.EXTRA_PUSH_TO_TALK_RELAY
 import io.homeassistant.companion.android.assist.wakeword.MicroWakeWordModelConfig
 import io.homeassistant.companion.android.assist.wakeword.WakeWordListener
 import io.homeassistant.companion.android.assist.wakeword.WakeWordListenerFactory
@@ -100,6 +102,7 @@ class AssistVoiceInteractionServiceTest {
         assertTrue(ACTION_START_LISTENING in registeredActions)
         assertTrue(ACTION_STOP_LISTENING in registeredActions)
         assertTrue(ACTION_RESUME_LISTENING in registeredActions)
+        assertTrue(ACTION_SHOW_PUSH_TO_TALK_SESSION in registeredActions)
     }
 
     @Test
@@ -161,6 +164,17 @@ class AssistVoiceInteractionServiceTest {
 
         coVerify(exactly = 0) { wakeWordListener.start(any(), any()) }
         coVerify(exactly = 0) { wakeWordListener.stop() }
+    }
+
+    @Test
+    fun `Given service ready when push to talk requested then show relayed session`() = runTest {
+        val shadow = Shadows.shadowOf(service) as ShadowVoiceInteractionService
+        service.onReady()
+        advanceUntilIdle()
+
+        sendAction(ACTION_SHOW_PUSH_TO_TALK_SESSION)
+
+        assertEquals(true, shadow.lastSessionBundle?.getBoolean(EXTRA_PUSH_TO_TALK_RELAY))
     }
 
     @Test
@@ -397,6 +411,11 @@ class AssistVoiceInteractionServiceTest {
     @Test
     fun `Given context when resumeListening then send RESUME_LISTENING broadcast with package`() {
         assertAction(ACTION_RESUME_LISTENING, AssistVoiceInteractionService::resumeListening)
+    }
+
+    @Test
+    fun `Given context when push to talk requested then send session broadcast with package`() {
+        assertAction(ACTION_SHOW_PUSH_TO_TALK_SESSION, AssistVoiceInteractionService::requestPushToTalkSession)
     }
 
     private fun getRegisteredReceiverActions(): Set<String> = Shadows.shadowOf(ApplicationProvider.getApplicationContext<Application>())

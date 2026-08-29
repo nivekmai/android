@@ -98,6 +98,18 @@ class AssistActivity : BaseActivity() {
                 "pushToTalk=${intent.getBooleanExtra(EXTRA_PUSH_TO_TALK, false)} saved=${savedInstanceState != null}",
         )
 
+        if (
+            savedInstanceState == null &&
+            intent.action == Intent.ACTION_ASSIST &&
+            pushToTalkSessionId == null &&
+            AssistVoiceInteractionService.isActiveService(this)
+        ) {
+            AssistPushToTalkDiagnostics.log("activity relaying ACTION_ASSIST to active voice service")
+            AssistVoiceInteractionService.requestPushToTalkSession(this)
+            finish()
+            return
+        }
+
         pushToTalkSessionId?.let { sessionId ->
             AssistPushToTalkController.register(sessionId, viewModel::onPushToTalkReleased)
         }

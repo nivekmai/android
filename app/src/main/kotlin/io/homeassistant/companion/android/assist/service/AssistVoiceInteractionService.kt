@@ -15,6 +15,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.service.voice.VoiceInteractionService
+import android.service.voice.VoiceInteractionSession
 import androidx.annotation.RequiresPermission
 import androidx.annotation.VisibleForTesting
 import androidx.core.app.NotificationCompat
@@ -105,6 +106,7 @@ class AssistVoiceInteractionService : VoiceInteractionService() {
                 addAction(ACTION_START_LISTENING)
                 addAction(ACTION_STOP_LISTENING)
                 addAction(ACTION_RESUME_LISTENING)
+                addAction(ACTION_SHOW_PUSH_TO_TALK_SESSION)
             },
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
@@ -155,6 +157,7 @@ class AssistVoiceInteractionService : VoiceInteractionService() {
     }
 
     override fun onLaunchVoiceAssistFromKeyguard() {
+        AssistPushToTalkDiagnostics.log("service.onLaunchVoiceAssistFromKeyguard")
         Timber.d("Launching Assist from keyguard")
         launchAssist()
     }
@@ -164,6 +167,7 @@ class AssistVoiceInteractionService : VoiceInteractionService() {
             ACTION_START_LISTENING -> startListening()
             ACTION_STOP_LISTENING -> stopListening()
             ACTION_RESUME_LISTENING -> resumeListening()
+            ACTION_SHOW_PUSH_TO_TALK_SESSION -> launchAssist(pushToTalk = true)
         }
     }
 
@@ -280,15 +284,21 @@ class AssistVoiceInteractionService : VoiceInteractionService() {
         }
     }
 
-    private fun launchAssist(wakeWord: String? = null) {
+    private fun launchAssist(wakeWord: String? = null, pushToTalk: Boolean = false) {
         if (!isServiceReady) {
+            AssistPushToTalkDiagnostics.warn(
+                "service cannot show session: not ready pushToTalk=$pushToTalk",
+            )
             Timber.w("Cannot launch Assist: VoiceInteractionService is not ready yet")
             return
         }
         val args = Bundle().apply {
             wakeWord?.let { putString(EXTRA_WAKE_WORD, it) }
+            putBoolean(EXTRA_PUSH_TO_TALK_RELAY, pushToTalk)
         }
-        showSession(args, 0)
+        val flags = if (pushToTalk) VoiceInteractionSession.SHOW_SOURCE_PUSH_TO_TALK else 0
+        AssistPushToTalkDiagnostics.log("service.showSession pushToTalk=$pushToTalk flags=$flags")
+        showSession(args, flags)
     }
 
     private fun createNotification(modelConfig: MicroWakeWordModelConfig): Notification {
@@ -346,8 +356,15 @@ class AssistVoiceInteractionService : VoiceInteractionService() {
         @VisibleForTesting
         const val ACTION_RESUME_LISTENING = "io.homeassistant.companion.android.RESUME_LISTENING"
 
+        @VisibleForTesting
+        const val ACTION_SHOW_PUSH_TO_TALK_SESSION =
+            "io.homeassistant.companion.android.SHOW_PUSH_TO_TALK_SESSION"
+
         /** Bundle key for passing the detected wake word phrase to the session. */
         const val EXTRA_WAKE_WORD = "wake_word"
+
+        @VisibleForTesting
+        const val EXTRA_PUSH_TO_TALK_RELAY = "push_to_talk_relay"
 
         private const val ACTION_WAKE_WORD_DETECTED = "io.homeassistant.companion.android.WAKE_WORD_DETECTED"
 
@@ -389,6 +406,11 @@ class AssistVoiceInteractionService : VoiceInteractionService() {
          */
         fun resumeListening(context: Context) {
             broadcastAction(context, ACTION_RESUME_LISTENING)
+        }
+
+        /** Relay an ACTION_ASSIST activity invocation into the active voice interaction service. */
+        fun requestPushToTalkSession(context: Context) {
+            broadcastAction(context, ACTION_SHOW_PUSH_TO_TALK_SESSION)
         }
 
         /**
