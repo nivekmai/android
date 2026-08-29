@@ -2,6 +2,7 @@ package io.homeassistant.companion.android.assist.service
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -46,13 +47,29 @@ class AssistVoiceInteractionSession(context: Context) : VoiceInteractionSession(
             wakeWordPhrase = wakeWord,
             pushToTalkSessionId = sessionId,
             pushToTalk = invokedByPushToTalk,
-        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ).apply {
+            action = Intent.ACTION_MAIN
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
         try {
             startVoiceActivity(intent)
             AssistPushToTalkDiagnostics.log("session.startVoiceActivity id=${sessionId.take(8)} succeeded")
-        } catch (exception: RuntimeException) {
-            AssistPushToTalkDiagnostics.warn("session.startVoiceActivity id=${sessionId.take(8)} failed", exception)
-            throw exception
+        } catch (exception: SecurityException) {
+            AssistPushToTalkDiagnostics.warn(
+                "session.startVoiceActivity id=${sessionId.take(8)} rejected; using assistant activity",
+                exception,
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startAssistantActivity(intent)
+                AssistPushToTalkDiagnostics.log(
+                    "session.startAssistantActivity id=${sessionId.take(8)} succeeded",
+                )
+            } else {
+                context.startActivity(intent)
+                AssistPushToTalkDiagnostics.log(
+                    "session.context.startActivity id=${sessionId.take(8)} succeeded",
+                )
+            }
         }
     }
 

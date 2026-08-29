@@ -554,6 +554,13 @@
                 <action android:name="android.intent.action.ASSIST" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!-- startVoiceActivity adds CATEGORY_VOICE and verifies that the target activity
+                 advertises a matching voice-capable intent before Android will launch it. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.VOICE" />
+            </intent-filter>
         </activity>
         <activity-alias
             android:name=".assist.VoiceCommandIntentActivity"
