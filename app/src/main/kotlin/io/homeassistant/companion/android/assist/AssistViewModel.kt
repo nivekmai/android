@@ -61,6 +61,8 @@ class AssistViewModel @AssistedInject constructor(
     private var wakeWordPhrase: String? = null
 
     private var recorderAutoStart = true
+    private var pushToTalk = false
+    private var pushToTalkReleased = false
     private var requestPermission: (() -> Unit)? = null
     private var requestSilently = true
 
@@ -97,11 +99,13 @@ class AssistViewModel @AssistedInject constructor(
         pipelineId: String?,
         startListening: Boolean?,
         wakeWordPhrase: String?,
+        pushToTalk: Boolean = false,
     ) {
         viewModelScope.launch {
             this@AssistViewModel.hasPermission = hasPermission
             this@AssistViewModel.wakeWordPhrase = wakeWordPhrase
             this@AssistViewModel.startedFromWakeWord = wakeWordPhrase != null
+            this@AssistViewModel.pushToTalk = pushToTalk
             serverId?.let {
                 filteredServerId = serverId
                 selectedServerId = serverId
@@ -415,6 +419,19 @@ class AssistViewModel @AssistedInject constructor(
         restartInactivityTimer()
 
         recorderProactive = proactive == true
+        if (pushToTalkReleased) {
+            pushToTalkReleased = false
+            finishRecordingWhenReady()
+        }
+    }
+
+    /** Finalize buffered microphone audio when the assistant invocation button is released. */
+    fun onPushToTalkReleased() {
+        pushToTalkReleased = true
+        if (inputMode == AssistInputMode.VOICE_ACTIVE) {
+            pushToTalkReleased = false
+            finishRecordingWhenReady()
+        }
     }
 
     private fun runAssistPipeline(text: String?) {
@@ -434,6 +451,7 @@ class AssistViewModel @AssistedInject constructor(
             text = text,
             pipeline = selectedPipeline,
             wakeWordPhrase = wakeWord,
+            pushToTalk = pushToTalk,
         ) { event ->
             when (event) {
                 is AssistEvent.Message -> {

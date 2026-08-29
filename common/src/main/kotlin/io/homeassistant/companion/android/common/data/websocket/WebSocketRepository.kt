@@ -153,6 +153,7 @@ interface WebSocketRepository {
         pipelineId: String? = null,
         conversationId: String? = null,
         wakeWordPhrase: String? = null,
+        pushToTalk: Boolean = false,
     ): Flow<AssistPipelineEvent>?
 
     /**

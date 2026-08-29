@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,6 +19,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.withCreationCallback
 import io.homeassistant.companion.android.BaseActivity
 import io.homeassistant.companion.android.assist.service.AssistVoiceInteractionService
+import io.homeassistant.companion.android.assist.service.AssistPushToTalkController
 import io.homeassistant.companion.android.assist.ui.AssistSheetView
 import io.homeassistant.companion.android.common.assist.AssistViewModelBase
 import io.homeassistant.companion.android.common.data.servers.ServerManager
@@ -48,6 +50,9 @@ class AssistActivity : BaseActivity() {
     )
 
     private var contextIsLocked = true
+    private val pushToTalkSessionId: String? by lazy {
+        intent.getStringExtra(EXTRA_PUSH_TO_TALK_SESSION_ID)
+    }
 
     companion object {
         private const val EXTRA_SERVER = "server"
@@ -55,6 +60,8 @@ class AssistActivity : BaseActivity() {
         private const val EXTRA_START_LISTENING = "start_listening"
         private const val EXTRA_FROM_FRONTEND = "from_frontend"
         private const val EXTRA_FROM_WAKE_WORD_PHRASE = "from_wake_word_phrase"
+        private const val EXTRA_PUSH_TO_TALK_SESSION_ID = "push_to_talk_session_id"
+        private const val EXTRA_PUSH_TO_TALK = "push_to_talk"
 
         fun newInstance(
             context: Context,
@@ -63,6 +70,8 @@ class AssistActivity : BaseActivity() {
             startListening: Boolean = true,
             fromFrontend: Boolean = true,
             wakeWordPhrase: String? = null,
+            pushToTalkSessionId: String? = null,
+            pushToTalk: Boolean = false,
         ): Intent {
             return Intent(context, AssistActivity::class.java).apply {
                 putExtra(EXTRA_SERVER, serverId)
@@ -70,6 +79,8 @@ class AssistActivity : BaseActivity() {
                 putExtra(EXTRA_START_LISTENING, startListening)
                 putExtra(EXTRA_FROM_FRONTEND, fromFrontend)
                 putExtra(EXTRA_FROM_WAKE_WORD_PHRASE, wakeWordPhrase)
+                putExtra(EXTRA_PUSH_TO_TALK_SESSION_ID, pushToTalkSessionId)
+                putExtra(EXTRA_PUSH_TO_TALK, pushToTalk)
             }
         }
     }
@@ -81,6 +92,10 @@ class AssistActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         updateShowWhenLocked()
+
+        pushToTalkSessionId?.let { sessionId ->
+            AssistPushToTalkController.register(sessionId, viewModel::onPushToTalkReleased)
+        }
 
         if (savedInstanceState == null) {
             lifecycleScope.launch {
@@ -111,6 +126,7 @@ class AssistActivity : BaseActivity() {
                     null
                 },
                 wakeWordPhrase = intent.getStringExtra(EXTRA_FROM_WAKE_WORD_PHRASE),
+                pushToTalk = intent.getBooleanExtra(EXTRA_PUSH_TO_TALK, false),
             )
         }
 
@@ -172,11 +188,20 @@ class AssistActivity : BaseActivity() {
     }
 
     override fun onDestroy() {
+        pushToTalkSessionId?.let(AssistPushToTalkController::unregister)
         super.onDestroy()
         viewModel.onDestroy()
         // This is a safety net: if the listener did not properly start, we still want to
         // resume.
         AssistVoiceInteractionService.resumeListening(this)
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_POWER && event.action == KeyEvent.ACTION_UP) {
+            viewModel.onPushToTalkReleased()
+            return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onNewIntent(intent: Intent) {

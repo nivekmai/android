@@ -139,6 +139,7 @@ abstract class AssistViewModelBase(
         text: String?,
         pipeline: AssistPipelineResponse?,
         wakeWordPhrase: String? = null,
+        pushToTalk: Boolean = false,
         onEvent: (AssistEvent) -> Unit,
     ) {
         val isVoice = text == null
@@ -152,6 +153,7 @@ abstract class AssistViewModelBase(
                         pipelineId = pipeline?.id,
                         conversationId = conversationId,
                         wakeWordPhrase = wakeWordPhrase,
+                        pushToTalk = pushToTalk,
                     )
                 } else {
                     serverManager.integrationRepository(selectedServerId).getAssistResponse(
@@ -389,6 +391,19 @@ abstract class AssistViewModelBase(
         } ?: clearRecorderState()
 
         updateInputModeAfterRecording()
+    }
+
+    /** Stop capture now, but wait for the server handler so already-buffered audio is flushed. */
+    protected fun finishRecordingWhenReady() {
+        val ready = sttReady
+        if (binaryHandlerId != null || ready == null) {
+            stopRecording()
+            return
+        }
+        viewModelScope.launch {
+            ready.await()
+            stopRecording()
+        }
     }
 
     private fun stopAudioCapture() {

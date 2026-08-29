@@ -1,12 +1,12 @@
 package io.homeassistant.companion.android.assist.service
 
-import android.content.Intent
 import android.os.Bundle
+import android.service.voice.VoiceInteractionSession
+import android.view.KeyEvent
 import androidx.test.core.app.ApplicationProvider
 import dagger.hilt.android.testing.HiltTestApplication
-import io.homeassistant.companion.android.assist.AssistActivity
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,21 +23,27 @@ class AssistVoiceInteractionSessionTest {
     private val context = ApplicationProvider.getApplicationContext<android.app.Application>()
 
     @Test
-    fun `Given session when onShow then start AssistActivity and finish session`() {
+    fun `Given session when power key released then notify activity and finish session`() {
         val session = AssistVoiceInteractionSession(context)
         val shadow = Shadows.shadowOf(session) as ShadowVoiceInteractionSession
         shadow.create()
 
-        session.onShow(Bundle(), 0)
+        session.onShow(Bundle(), VoiceInteractionSession.SHOW_SOURCE_PUSH_TO_TALK)
 
-        val shadowApplication = Shadows.shadowOf(context)
-        val startedIntent = shadowApplication.nextStartedActivity
-        assertNotNull(startedIntent)
-        assertEquals(AssistActivity::class.java.name, startedIntent.component?.className)
-        assertTrue(startedIntent.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+        assertFalse(shadow.isFinishing)
 
-        // finish() is posted to the handler to avoid BadTokenException
+        val sessionId = AssistVoiceInteractionSession::class.java
+            .getDeclaredField("pushToTalkSessionId")
+            .apply { isAccessible = true }
+            .get(session) as? String
+        assertNotNull(sessionId)
+        var released = false
+        AssistPushToTalkController.register(sessionId!!) { released = true }
+
+        assertTrue(session.onKeyUp(KeyEvent.KEYCODE_POWER, KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_POWER)))
         ShadowLooper.idleMainLooper()
+        assertTrue(released)
         assertTrue(shadow.isFinishing)
+        AssistPushToTalkController.unregister(sessionId)
     }
 }
