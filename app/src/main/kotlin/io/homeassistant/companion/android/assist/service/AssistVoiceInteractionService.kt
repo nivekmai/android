@@ -25,8 +25,8 @@ import io.homeassistant.companion.android.assist.service.AssistVoiceInteractionS
 import io.homeassistant.companion.android.assist.wakeword.MicroWakeWordModelConfig
 import io.homeassistant.companion.android.assist.wakeword.WakeWordListener
 import io.homeassistant.companion.android.assist.wakeword.WakeWordListenerFactory
-import io.homeassistant.companion.android.common.assist.AssistPushToTalkDiagnostics
 import io.homeassistant.companion.android.common.R as commonR
+import io.homeassistant.companion.android.common.assist.AssistPushToTalkDiagnostics
 import io.homeassistant.companion.android.common.util.CHANNEL_ASSIST_LISTENING
 import io.homeassistant.companion.android.common.util.SdkVersion
 import io.homeassistant.companion.android.settings.assist.AssistConfigManager

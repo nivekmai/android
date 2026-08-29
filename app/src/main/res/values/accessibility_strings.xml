@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="assist_power_button_accessibility_label">Power-button push-to-talk diagnostics</string>
+    <string name="assist_power_button_accessibility_description">Observes hardware Power key transitions without consuming them, and ends an active Home Assistant push-to-talk recording when the key is released. It does not read screen content or perform gestures.</string>
+</resources>

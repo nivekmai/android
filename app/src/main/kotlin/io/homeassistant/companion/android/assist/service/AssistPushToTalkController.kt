@@ -6,6 +6,13 @@ import io.homeassistant.companion.android.common.assist.AssistPushToTalkDiagnost
 object AssistPushToTalkController {
     private val listeners = mutableMapOf<String, () -> Unit>()
     private val pendingReleases = mutableSetOf<String>()
+    private var activeSessionId: String? = null
+
+    @Synchronized
+    fun markActive(sessionId: String) {
+        activeSessionId = sessionId
+        AssistPushToTalkDiagnostics.log("controller.markActive id=${sessionId.take(8)}")
+    }
 
     @Synchronized
     fun register(sessionId: String, listener: () -> Unit) {
@@ -29,9 +36,19 @@ object AssistPushToTalkController {
     }
 
     @Synchronized
+    fun releaseActive(source: String) {
+        val sessionId = activeSessionId
+        AssistPushToTalkDiagnostics.log(
+            "controller.releaseActive source=$source id=${sessionId?.take(8)}",
+        )
+        sessionId?.let(::release)
+    }
+
+    @Synchronized
     fun unregister(sessionId: String) {
         AssistPushToTalkDiagnostics.log("controller.unregister id=${sessionId.take(8)}")
         listeners.remove(sessionId)
         pendingReleases.remove(sessionId)
+        if (activeSessionId == sessionId) activeSessionId = null
     }
 }

@@ -6,8 +6,9 @@ import android.service.voice.VoiceInteractionSession
 import android.view.KeyEvent
 import androidx.test.core.app.ApplicationProvider
 import dagger.hilt.android.testing.HiltTestApplication
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -59,4 +60,39 @@ class AssistVoiceInteractionSessionTest {
         assertTrue(shadow.isFinishing)
         AssistPushToTalkController.unregister(sessionId)
     }
+
+    @Test
+    fun `Given Pixel power invocation metadata then classify assist gesture as push to talk`() {
+        val session = AssistVoiceInteractionSession(context)
+        val shadow = Shadows.shadowOf(session) as ShadowVoiceInteractionSession
+        shadow.create()
+
+        session.onShow(
+            Bundle().apply { putInt("invocation_type", 6) },
+            VoiceInteractionSession.SHOW_SOURCE_ASSIST_GESTURE,
+        )
+
+        val sessionId = getPushToTalkSessionId(session)
+        assertNotNull(sessionId)
+        AssistPushToTalkController.unregister(sessionId!!)
+    }
+
+    @Test
+    fun `Given screen gesture metadata then do not classify as push to talk`() {
+        val session = AssistVoiceInteractionSession(context)
+        val shadow = Shadows.shadowOf(session) as ShadowVoiceInteractionSession
+        shadow.create()
+
+        session.onShow(
+            Bundle().apply { putInt("invocation_type", 1) },
+            VoiceInteractionSession.SHOW_SOURCE_ASSIST_GESTURE,
+        )
+
+        assertNull(getPushToTalkSessionId(session))
+    }
+
+    private fun getPushToTalkSessionId(session: AssistVoiceInteractionSession) = AssistVoiceInteractionSession::class.java
+        .getDeclaredField("pushToTalkSessionId")
+        .apply { isAccessible = true }
+        .get(session) as? String
 }

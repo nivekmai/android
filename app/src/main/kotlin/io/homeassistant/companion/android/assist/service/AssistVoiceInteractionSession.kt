@@ -32,12 +32,19 @@ class AssistVoiceInteractionSession(context: Context) : VoiceInteractionSession(
         super.onShow(args, showFlags)
 
         val wakeWord = args?.getString(AssistVoiceInteractionService.EXTRA_WAKE_WORD)
-        val sessionId = UUID.randomUUID().toString().also { pushToTalkSessionId = it }
-        val invokedByPushToTalk = showFlags and SHOW_SOURCE_PUSH_TO_TALK != 0
+        val sessionId = UUID.randomUUID().toString()
+        val invocationType = args?.getInt(INVOCATION_TYPE_KEY, INVOCATION_TYPE_UNKNOWN)
+            ?: INVOCATION_TYPE_UNKNOWN
+        val invokedByPushToTalk =
+            showFlags and SHOW_SOURCE_PUSH_TO_TALK != 0 ||
+                invocationType == INVOCATION_TYPE_POWER_BUTTON_LONG_PRESS
+        pushToTalkSessionId = sessionId.takeIf { invokedByPushToTalk }
+        if (invokedByPushToTalk) AssistPushToTalkController.markActive(sessionId)
         AssistPushToTalkDiagnostics.log(
             "session.onShow id=${sessionId.take(8)} flags=$showFlags " +
                 "decoded=${decodeShowFlags(showFlags)} pushToTalk=$invokedByPushToTalk " +
-                "wakeWord=${wakeWord != null} argKeys=${args?.keySet()?.sorted() ?: emptyList<String>()}",
+                "invocationType=$invocationType wakeWord=${wakeWord != null} " +
+                "argKeys=${args?.keySet()?.sorted() ?: emptyList<String>()}",
         )
 
         // Launch AssistActivity to handle the interaction
@@ -124,5 +131,11 @@ class AssistVoiceInteractionSession(context: Context) : VoiceInteractionSession(
     }.joinToString("|")
 
     private fun KeyEvent.describe() =
-        "keyCode=$keyCode action=$action repeat=$repeatCount flags=$flags tracking=${isTracking} canceled=${isCanceled}"
+        "keyCode=$keyCode action=$action repeat=$repeatCount flags=$flags tracking=$isTracking canceled=$isCanceled"
+
+    private companion object {
+        const val INVOCATION_TYPE_KEY = "invocation_type"
+        const val INVOCATION_TYPE_UNKNOWN = 0
+        const val INVOCATION_TYPE_POWER_BUTTON_LONG_PRESS = 6
+    }
 }

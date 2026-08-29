@@ -615,6 +615,21 @@
                 android:resource="@xml/recognition_service" />
         </service>
 
+        <!-- Opt-in diagnostic service for testing whether Android exposes the Power key release
+             to third-party accessibility services. It does not retrieve window content. -->
+        <service
+            android:name=".assist.service.AssistPushToTalkAccessibilityService"
+            android:exported="true"
+            android:label="@string/assist_power_button_accessibility_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/assist_push_to_talk_accessibility_service" />
+        </service>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"

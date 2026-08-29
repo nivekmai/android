@@ -18,8 +18,8 @@ import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.withCreationCallback
 import io.homeassistant.companion.android.BaseActivity
-import io.homeassistant.companion.android.assist.service.AssistVoiceInteractionService
 import io.homeassistant.companion.android.assist.service.AssistPushToTalkController
+import io.homeassistant.companion.android.assist.service.AssistVoiceInteractionService
 import io.homeassistant.companion.android.assist.ui.AssistSheetView
 import io.homeassistant.companion.android.common.assist.AssistPushToTalkDiagnostics
 import io.homeassistant.companion.android.common.assist.AssistViewModelBase
@@ -110,8 +110,10 @@ class AssistActivity : BaseActivity() {
             return
         }
 
-        pushToTalkSessionId?.let { sessionId ->
-            AssistPushToTalkController.register(sessionId, viewModel::onPushToTalkReleased)
+        if (intent.getBooleanExtra(EXTRA_PUSH_TO_TALK, false)) {
+            pushToTalkSessionId?.let { sessionId ->
+                AssistPushToTalkController.register(sessionId, viewModel::onPushToTalkReleased)
+            }
         }
 
         if (savedInstanceState == null) {
