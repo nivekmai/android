@@ -170,6 +170,7 @@ abstract class AssistViewModelBase(
             }
 
             flow?.collect { event ->
+                if (pushToTalk) AssistPushToTalkDiagnostics.log("pipeline.event type=${event.type}")
                 when (event.type) {
                     AssistPipelineEventType.RUN_START -> {
                         handleRunStart(
@@ -248,15 +249,18 @@ abstract class AssistViewModelBase(
         }
 
         binaryHandlerId = data?.runnerData?.get("stt_binary_handler_id") as? Int
+        AssistPushToTalkDiagnostics.log("pipeline.RUN_START binaryHandlerReady=${binaryHandlerId != null}")
     }
 
     private fun handleSttStart() {
+        AssistPushToTalkDiagnostics.log("pipeline.STT_START binaryHandlerReady=${binaryHandlerId != null}")
         binaryHandlerId?.let { id ->
             sttReady?.complete(id)
         }
     }
 
     private fun handleSttEnd(data: AssistPipelineSttEnd?, onEvent: (AssistEvent) -> Unit) {
+        AssistPushToTalkDiagnostics.log("pipeline.STT_END received from server")
         stopRecording()
         data?.sttOutput?.get("text")?.let { text ->
             onEvent(AssistEvent.Message.Input(text as String))
@@ -384,6 +388,10 @@ abstract class AssistViewModelBase(
     }
 
     protected fun stopRecording(sendRecorded: Boolean = true) {
+        AssistPushToTalkDiagnostics.log(
+            "audio.stopRecording sendRecorded=$sendRecorded inputMode=${getInput()} " +
+                "binaryHandlerReady=${binaryHandlerId != null} proactive=$recorderProactive",
+        )
         stopAudioCapture()
 
         binaryHandlerId?.let { handlerId ->
@@ -396,12 +404,17 @@ abstract class AssistViewModelBase(
     /** Stop capture now, but wait for the server handler so already-buffered audio is flushed. */
     protected fun finishRecordingWhenReady() {
         val ready = sttReady
+        AssistPushToTalkDiagnostics.log(
+            "audio.finishRecordingWhenReady binaryHandlerReady=${binaryHandlerId != null} " +
+                "sttReadyExists=${ready != null} sttReadyCompleted=${ready?.isCompleted}",
+        )
         if (binaryHandlerId != null || ready == null) {
             stopRecording()
             return
         }
         viewModelScope.launch {
             ready.await()
+            AssistPushToTalkDiagnostics.log("audio server became ready after release; flushing buffered audio")
             stopRecording()
         }
     }
@@ -417,10 +430,12 @@ abstract class AssistViewModelBase(
             if (sendRecorded) {
                 recorderJob?.join()
                 try {
+                    AssistPushToTalkDiagnostics.log("audio sending explicit end-of-stream handler=$handlerId")
                     serverManager.webSocketRepository(selectedServerId).sendVoiceData(
                         handlerId,
                         byteArrayOf(),
                     )
+                    AssistPushToTalkDiagnostics.log("audio explicit end-of-stream sent handler=$handlerId")
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {

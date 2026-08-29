@@ -1,5 +1,6 @@
 package io.homeassistant.companion.android.common.data.websocket.impl
 
+import io.homeassistant.companion.android.common.assist.AssistPushToTalkDiagnostics
 import io.homeassistant.companion.android.common.assist.PersonalDataKeyManager
 import io.homeassistant.companion.android.common.data.HomeAssistantVersion
 import io.homeassistant.companion.android.common.data.integration.ActionData
@@ -311,9 +312,20 @@ class WebSocketRepositoryImpl internal constructor(
         pushToTalk: Boolean,
     ): Flow<AssistPipelineEvent>? {
         preparePersonalDataGrant()
-        val supportsPushToTalk = pushToTalk && runCatching {
-            webSocketCore.sendMessage(mapOf("type" to PHONE_ASSIST_CAPABILITIES))?.success == true
-        }.getOrDefault(false)
+        val supportsPushToTalk = if (pushToTalk) {
+            try {
+                val response = webSocketCore.sendMessage(mapOf("type" to PHONE_ASSIST_CAPABILITIES))
+                AssistPushToTalkDiagnostics.log(
+                    "websocket capability response success=${response?.success} hasResult=${response?.result != null}",
+                )
+                response?.success == true
+            } catch (exception: Exception) {
+                AssistPushToTalkDiagnostics.warn("websocket capability request failed", exception)
+                false
+            }
+        } else {
+            false
+        }
         val data = buildMap {
             put("start_stage", "stt")
             put("end_stage", if (outputTts) "tts" else "intent")
@@ -329,8 +341,14 @@ class WebSocketRepositoryImpl internal constructor(
             pipelineId?.let { put("pipeline", it) }
             webSocketCore.server()?.deviceRegistryId?.let { put("device_id", it) }
         }
+        val endpoint =
+            if (supportsPushToTalk) PHONE_ASSIST_PUSH_TO_TALK_PIPELINE else SUBSCRIBE_TYPE_ASSIST_PIPELINE_RUN
+        AssistPushToTalkDiagnostics.log(
+            "websocket voice pipeline pushToTalk=$pushToTalk supported=$supportsPushToTalk " +
+                "endpoint=$endpoint noVad=$supportsPushToTalk",
+        )
         return webSocketCore.subscribeTo(
-            if (supportsPushToTalk) PHONE_ASSIST_PUSH_TO_TALK_PIPELINE else SUBSCRIBE_TYPE_ASSIST_PIPELINE_RUN,
+            endpoint,
             data,
         )
     }

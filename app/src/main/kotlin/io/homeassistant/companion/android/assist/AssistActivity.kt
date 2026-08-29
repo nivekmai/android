@@ -21,6 +21,7 @@ import io.homeassistant.companion.android.BaseActivity
 import io.homeassistant.companion.android.assist.service.AssistVoiceInteractionService
 import io.homeassistant.companion.android.assist.service.AssistPushToTalkController
 import io.homeassistant.companion.android.assist.ui.AssistSheetView
+import io.homeassistant.companion.android.common.assist.AssistPushToTalkDiagnostics
 import io.homeassistant.companion.android.common.assist.AssistViewModelBase
 import io.homeassistant.companion.android.common.data.servers.ServerManager
 import io.homeassistant.companion.android.common.util.SdkVersion
@@ -92,6 +93,10 @@ class AssistActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         updateShowWhenLocked()
+        AssistPushToTalkDiagnostics.log(
+            "activity.onCreate action=${intent.action} id=${pushToTalkSessionId?.take(8)} " +
+                "pushToTalk=${intent.getBooleanExtra(EXTRA_PUSH_TO_TALK, false)} saved=${savedInstanceState != null}",
+        )
 
         pushToTalkSessionId?.let { sessionId ->
             AssistPushToTalkController.register(sessionId, viewModel::onPushToTalkReleased)
@@ -177,17 +182,20 @@ class AssistActivity : BaseActivity() {
 
     override fun onResume() {
         super.onResume()
+        AssistPushToTalkDiagnostics.log("activity.onResume id=${pushToTalkSessionId?.take(8)}")
         viewModel.setPermissionInfo(hasRecordingPermission()) {
             requestPermission.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
     override fun onPause() {
+        AssistPushToTalkDiagnostics.log("activity.onPause id=${pushToTalkSessionId?.take(8)}")
         super.onPause()
         viewModel.onPause()
     }
 
     override fun onDestroy() {
+        AssistPushToTalkDiagnostics.log("activity.onDestroy id=${pushToTalkSessionId?.take(8)}")
         pushToTalkSessionId?.let(AssistPushToTalkController::unregister)
         super.onDestroy()
         viewModel.onDestroy()
@@ -197,7 +205,12 @@ class AssistActivity : BaseActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        AssistPushToTalkDiagnostics.log(
+            "activity.dispatchKeyEvent keyCode=${event.keyCode} action=${event.action} " +
+                "repeat=${event.repeatCount} flags=${event.flags}",
+        )
         if (event.keyCode == KeyEvent.KEYCODE_POWER && event.action == KeyEvent.ACTION_UP) {
+            AssistPushToTalkDiagnostics.log("activity received POWER release")
             viewModel.onPushToTalkReleased()
             return true
         }
@@ -205,6 +218,7 @@ class AssistActivity : BaseActivity() {
     }
 
     override fun onNewIntent(intent: Intent) {
+        AssistPushToTalkDiagnostics.log("activity.onNewIntent action=${intent.action}")
         super.onNewIntent(intent)
         this.intent = intent
 

@@ -17,6 +17,7 @@ import io.homeassistant.companion.android.assist.ui.AssistUiPipeline
 import io.homeassistant.companion.android.common.R as commonR
 import io.homeassistant.companion.android.common.assist.AssistAudioStrategy
 import io.homeassistant.companion.android.common.assist.AssistEvent
+import io.homeassistant.companion.android.common.assist.AssistPushToTalkDiagnostics
 import io.homeassistant.companion.android.common.assist.AssistViewModelBase
 import io.homeassistant.companion.android.common.data.servers.ServerManager
 import io.homeassistant.companion.android.common.data.websocket.impl.entities.AssistPipelineResponse
@@ -106,6 +107,10 @@ class AssistViewModel @AssistedInject constructor(
             this@AssistViewModel.wakeWordPhrase = wakeWordPhrase
             this@AssistViewModel.startedFromWakeWord = wakeWordPhrase != null
             this@AssistViewModel.pushToTalk = pushToTalk
+            AssistPushToTalkDiagnostics.log(
+                "viewModel.onCreate pushToTalk=$pushToTalk startListening=$startListening " +
+                    "hasPermission=$hasPermission wakeWord=${wakeWordPhrase != null}",
+            )
             serverId?.let {
                 filteredServerId = serverId
                 selectedServerId = serverId
@@ -389,6 +394,10 @@ class AssistViewModel @AssistedInject constructor(
      * @param proactive true if proactive, null if not important, false if not
      */
     fun onMicrophoneInput(proactive: Boolean? = false) {
+        AssistPushToTalkDiagnostics.log(
+            "viewModel.onMicrophoneInput proactive=$proactive inputMode=$inputMode " +
+                "pushToTalk=$pushToTalk releasePending=$pushToTalkReleased",
+        )
         if (!hasPermission) {
             requestPermission?.let { it() }
             return
@@ -420,6 +429,7 @@ class AssistViewModel @AssistedInject constructor(
 
         recorderProactive = proactive == true
         if (pushToTalkReleased) {
+            AssistPushToTalkDiagnostics.log("viewModel applying release received before recording became active")
             pushToTalkReleased = false
             finishRecordingWhenReady()
         }
@@ -427,6 +437,7 @@ class AssistViewModel @AssistedInject constructor(
 
     /** Finalize buffered microphone audio when the assistant invocation button is released. */
     fun onPushToTalkReleased() {
+        AssistPushToTalkDiagnostics.log("viewModel.onPushToTalkReleased inputMode=$inputMode")
         pushToTalkReleased = true
         if (inputMode == AssistInputMode.VOICE_ACTIVE) {
             pushToTalkReleased = false
@@ -446,6 +457,9 @@ class AssistViewModel @AssistedInject constructor(
 
         // Capture and clear wake word phrase - it should only be sent once for the initial command
         val wakeWord = wakeWordPhrase.also { wakeWordPhrase = null }
+        AssistPushToTalkDiagnostics.log(
+            "viewModel.runAssistPipeline voice=$isVoice pushToTalk=$pushToTalk wakeWord=${wakeWord != null}",
+        )
 
         runAssistPipelineInternal(
             text = text,
