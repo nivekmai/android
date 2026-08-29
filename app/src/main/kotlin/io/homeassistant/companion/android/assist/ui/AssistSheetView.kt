@@ -1,17 +1,10 @@
 package io.homeassistant.companion.android.assist.ui
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,14 +15,15 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.Divider
 import androidx.compose.material.DropdownMenu
@@ -37,7 +31,6 @@ import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
-import androidx.compose.material.LocalContentColor
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.ModalBottomSheetLayout
 import androidx.compose.material.ModalBottomSheetValue
@@ -58,8 +51,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -82,6 +73,7 @@ import kotlinx.coroutines.launch
 
 private val HEADER_HEIGHT = 48.dp
 private val CONTROLS_HEIGHT = 112.dp
+private val ASSIST_BUTTON_HEIGHT = 80.dp
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
@@ -244,7 +236,10 @@ fun AssistSheetControls(
     onTextInput: (String) -> Unit,
     onMicrophoneInput: () -> Unit,
     modifier: Modifier = Modifier,
-) = Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
+) = Row(
+    verticalAlignment = Alignment.CenterVertically,
+    modifier = modifier.fillMaxWidth(),
+) {
     if (inputMode == null) { // Pipeline info has not yet loaded, empty space for now
         Spacer(modifier = Modifier.height(64.dp))
         return@Row
@@ -307,63 +302,77 @@ fun AssistSheetControls(
             )
         }
     } else {
-        Spacer(Modifier.size(48.dp))
-        Spacer(Modifier.weight(0.5f))
-        Box(
-            modifier = Modifier.size(64.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            val inputIsActive = inputMode == AssistViewModelBase.AssistInputMode.VOICE_ACTIVE
-            if (inputIsActive) {
-                val transition = rememberInfiniteTransition()
-                val scale by transition.animateFloat(
-                    initialValue = 1f,
-                    targetValue = 1.2f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(600, easing = LinearEasing),
-                        repeatMode = RepeatMode.Reverse,
-                    ),
-                )
+        val inputIsActive = inputMode == AssistViewModelBase.AssistInputMode.VOICE_ACTIVE
+        if (inputIsActive) {
+            Button(
+                onClick = onMicrophoneInput,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(ASSIST_BUTTON_HEIGHT),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = MaterialTheme.colors.error,
+                    contentColor = MaterialTheme.colors.onError,
+                ),
+            ) {
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
-                        .scale(scale)
-                        .background(color = colorResource(commonR.color.colorSpeechText), shape = CircleShape)
-                        .clip(CircleShape),
+                        .size(18.dp)
+                        .background(MaterialTheme.colors.onError, RoundedCornerShape(3.dp)),
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = stringResource(commonR.string.assist_done),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
-            OutlinedButton(
-                onClick = { onMicrophoneInput() },
-                modifier = Modifier.size(48.dp),
-                shape = CircleShape,
-                border = if (inputIsActive) null else ButtonDefaults.outlinedBorder,
-                colors = if (inputIsActive) {
-                    ButtonDefaults.outlinedButtonColors(backgroundColor = Color.Transparent, contentColor = Color.Black)
-                } else {
-                    ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colors.onSurface)
-                },
-                contentPadding = PaddingValues(all = 0.dp),
-            ) {
-                Image(
-                    asset = CommunityMaterial.Icon3.cmd_microphone,
-                    contentDescription = stringResource(
-                        if (inputIsActive) {
-                            commonR.string.assist_stop_listening
-                        } else {
-                            commonR.string.assist_start_listening
-                        },
-                    ),
-                    colorFilter = ColorFilter.tint(LocalContentColor.current),
-                    modifier = Modifier.size(28.dp),
-                )
-            }
+            return@Row
         }
-        Spacer(Modifier.weight(0.5f))
-        IconButton({ onChangeInput() }) {
+
+        OutlinedButton(
+            onClick = onChangeInput,
+            modifier = Modifier
+                .weight(1f)
+                .height(ASSIST_BUTTON_HEIGHT),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colors.onSurface),
+        ) {
             Icon(
                 imageVector = Icons.Outlined.Keyboard,
-                contentDescription = stringResource(commonR.string.assist_enter_text),
-                tint = MaterialTheme.colors.onSurface,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = stringResource(commonR.string.assist_keyboard),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Button(
+            onClick = onMicrophoneInput,
+            modifier = Modifier
+                .weight(1f)
+                .height(ASSIST_BUTTON_HEIGHT),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                backgroundColor = MaterialTheme.colors.primary,
+                contentColor = MaterialTheme.colors.onPrimary,
+            ),
+        ) {
+            Image(
+                asset = CommunityMaterial.Icon3.cmd_microphone,
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(MaterialTheme.colors.onPrimary),
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = stringResource(commonR.string.assist_speak),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
             )
         }
     }
