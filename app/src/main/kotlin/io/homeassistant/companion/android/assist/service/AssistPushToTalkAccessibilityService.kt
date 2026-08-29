@@ -28,8 +28,9 @@ class AssistPushToTalkAccessibilityService : AccessibilityService() {
                 "accessibility.onKeyEvent POWER action=${event.action} repeat=${event.repeatCount} " +
                     "flags=${event.flags} canceled=${event.isCanceled}",
             )
-            if (event.action == KeyEvent.ACTION_UP) {
-                AssistPushToTalkController.releaseActive("accessibility-power-up")
+            when (event.action) {
+                KeyEvent.ACTION_DOWN -> AssistPushToTalkController.noteAccessibilityPowerDown()
+                KeyEvent.ACTION_UP -> AssistPushToTalkController.releaseActive("accessibility-power-up")
             }
         }
         return false

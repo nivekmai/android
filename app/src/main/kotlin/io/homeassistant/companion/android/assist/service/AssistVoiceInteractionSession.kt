@@ -35,15 +35,19 @@ class AssistVoiceInteractionSession(context: Context) : VoiceInteractionSession(
         val sessionId = UUID.randomUUID().toString()
         val invocationType = args?.getInt(INVOCATION_TYPE_KEY, INVOCATION_TYPE_UNKNOWN)
             ?: INVOCATION_TYPE_UNKNOWN
+        val accessibilityPowerDownObserved =
+            invocationType == INVOCATION_TYPE_POWER_BUTTON_LONG_PRESS &&
+                AssistPushToTalkController.consumeRecentAccessibilityPowerDown()
         val invokedByPushToTalk =
             showFlags and SHOW_SOURCE_PUSH_TO_TALK != 0 ||
-                invocationType == INVOCATION_TYPE_POWER_BUTTON_LONG_PRESS
+                accessibilityPowerDownObserved
         pushToTalkSessionId = sessionId.takeIf { invokedByPushToTalk }
         if (invokedByPushToTalk) AssistPushToTalkController.markActive(sessionId)
         AssistPushToTalkDiagnostics.log(
             "session.onShow id=${sessionId.take(8)} flags=$showFlags " +
                 "decoded=${decodeShowFlags(showFlags)} pushToTalk=$invokedByPushToTalk " +
-                "invocationType=$invocationType wakeWord=${wakeWord != null} " +
+                "invocationType=$invocationType accessibilityDown=$accessibilityPowerDownObserved " +
+                "wakeWord=${wakeWord != null} " +
                 "argKeys=${args?.keySet()?.sorted() ?: emptyList<String>()}",
         )
 

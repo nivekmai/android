@@ -66,6 +66,7 @@ class AssistVoiceInteractionSessionTest {
         val session = AssistVoiceInteractionSession(context)
         val shadow = Shadows.shadowOf(session) as ShadowVoiceInteractionSession
         shadow.create()
+        AssistPushToTalkController.noteAccessibilityPowerDown()
 
         session.onShow(
             Bundle().apply { putInt("invocation_type", 6) },
@@ -75,6 +76,20 @@ class AssistVoiceInteractionSessionTest {
         val sessionId = getPushToTalkSessionId(session)
         assertNotNull(sessionId)
         AssistPushToTalkController.unregister(sessionId!!)
+    }
+
+    @Test
+    fun `Given Pixel power metadata without accessibility key then retain ordinary VAD`() {
+        val session = AssistVoiceInteractionSession(context)
+        val shadow = Shadows.shadowOf(session) as ShadowVoiceInteractionSession
+        shadow.create()
+
+        session.onShow(
+            Bundle().apply { putInt("invocation_type", 6) },
+            VoiceInteractionSession.SHOW_SOURCE_ASSIST_GESTURE,
+        )
+
+        assertNull(getPushToTalkSessionId(session))
     }
 
     @Test

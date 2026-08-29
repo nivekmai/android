@@ -1,5 +1,6 @@
 package io.homeassistant.companion.android.assist.service
 
+import android.os.SystemClock
 import io.homeassistant.companion.android.common.assist.AssistPushToTalkDiagnostics
 
 /** Bridges hardware-key callbacks from the voice interaction session to AssistActivity. */
@@ -7,6 +8,28 @@ object AssistPushToTalkController {
     private val listeners = mutableMapOf<String, () -> Unit>()
     private val pendingReleases = mutableSetOf<String>()
     private var activeSessionId: String? = null
+    private var accessibilityPowerDownAt: Long? = null
+
+    @Synchronized
+    fun noteAccessibilityPowerDown() {
+        accessibilityPowerDownAt = SystemClock.elapsedRealtime()
+        AssistPushToTalkDiagnostics.log("controller.noteAccessibilityPowerDown")
+    }
+
+    /**
+     * Consume a Power-down event only when it immediately preceded the system assistant session.
+     * If Android withholds the key from accessibility, the session must retain ordinary VAD.
+     */
+    @Synchronized
+    fun consumeRecentAccessibilityPowerDown(): Boolean {
+        val observedAt = accessibilityPowerDownAt.also { accessibilityPowerDownAt = null }
+        val age = observedAt?.let { SystemClock.elapsedRealtime() - it }
+        val recent = age != null && age in 0..ACCESSIBILITY_POWER_DOWN_MAX_AGE_MS
+        AssistPushToTalkDiagnostics.log(
+            "controller.consumeAccessibilityPowerDown observed=${observedAt != null} age=$age recent=$recent",
+        )
+        return recent
+    }
 
     @Synchronized
     fun markActive(sessionId: String) {
@@ -51,4 +74,6 @@ object AssistPushToTalkController {
         pendingReleases.remove(sessionId)
         if (activeSessionId == sessionId) activeSessionId = null
     }
+
+    private const val ACCESSIBILITY_POWER_DOWN_MAX_AGE_MS = 3_000L
 }
