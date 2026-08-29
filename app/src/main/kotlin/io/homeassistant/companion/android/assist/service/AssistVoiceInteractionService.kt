@@ -24,6 +24,7 @@ import io.homeassistant.companion.android.assist.service.AssistVoiceInteractionS
 import io.homeassistant.companion.android.assist.wakeword.MicroWakeWordModelConfig
 import io.homeassistant.companion.android.assist.wakeword.WakeWordListener
 import io.homeassistant.companion.android.assist.wakeword.WakeWordListenerFactory
+import io.homeassistant.companion.android.common.assist.AssistPushToTalkDiagnostics
 import io.homeassistant.companion.android.common.R as commonR
 import io.homeassistant.companion.android.common.util.CHANNEL_ASSIST_LISTENING
 import io.homeassistant.companion.android.common.util.SdkVersion
@@ -75,8 +76,14 @@ class AssistVoiceInteractionService : VoiceInteractionService() {
     /** Non-null only while the receiver is registered (between [onReady] and [onShutdown]). */
     private var actionReceiver: BroadcastReceiver? = null
 
+    override fun onCreate() {
+        super.onCreate()
+        AssistPushToTalkDiagnostics.log("service.onCreate")
+    }
+
     override fun onReady() {
         super.onReady()
+        AssistPushToTalkDiagnostics.log("service.onReady tornDown=$isTornDown")
         if (isTornDown) {
             // The system can deliver onReady even after onShutdown/onDestroy while it is winding the
             // service down. Registering a receiver on the dying context would later crash in
@@ -112,6 +119,7 @@ class AssistVoiceInteractionService : VoiceInteractionService() {
     }
 
     override fun onShutdown() {
+        AssistPushToTalkDiagnostics.log("service.onShutdown")
         super.onShutdown()
         isTornDown = true
         isServiceReady = false
@@ -133,6 +141,7 @@ class AssistVoiceInteractionService : VoiceInteractionService() {
     }
 
     override fun onDestroy() {
+        AssistPushToTalkDiagnostics.log("service.onDestroy")
         // onShutdown is not guaranteed to run before onDestroy, so latch teardown here too to keep
         // a late onReady from re-initializing an already-destroyed instance
         isTornDown = true
