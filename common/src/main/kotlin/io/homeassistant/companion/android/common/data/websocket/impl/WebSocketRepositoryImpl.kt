@@ -67,6 +67,7 @@ private const val PHONE_ASSIST_TOOLS_ACKNOWLEDGE_SERVICE = "acknowledge"
 private const val PERSONAL_DATA_CHALLENGE = "phone_assist_tools/personal_data/challenge"
 private const val PERSONAL_DATA_AUTHORIZE = "phone_assist_tools/personal_data/authorize"
 private const val PERSONAL_DATA_CANONICAL_PREFIX = "phone_assist_tools:v1"
+private const val PHONE_ASSIST_CAPABILITIES = "phone_assist_tools/capabilities"
 private const val PHONE_ASSIST_PUSH_TO_TALK_PIPELINE = "phone_assist_tools/assist_pipeline/run"
 
 class WebSocketRepositoryImpl internal constructor(
@@ -311,7 +312,7 @@ class WebSocketRepositoryImpl internal constructor(
     ): Flow<AssistPipelineEvent>? {
         preparePersonalDataGrant()
         val supportsPushToTalk = pushToTalk && runCatching {
-            getConfig()?.components?.contains(PHONE_ASSIST_TOOLS_DOMAIN) == true
+            webSocketCore.sendMessage(mapOf("type" to PHONE_ASSIST_CAPABILITIES))?.success == true
         }.getOrDefault(false)
         val data = buildMap {
             put("start_stage", "stt")

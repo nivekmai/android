@@ -234,6 +234,28 @@ class WebSocketRepositoryImplTest {
 
             assertEquals("stt", dataSlot.captured["start_stage"])
         }
+
+        @Test
+        fun `Given negotiated push to talk support then use no VAD endpoint`() = runTest {
+            val typeSlot = slot<String>()
+            val dataSlot = slot<Map<String, Any?>>()
+            coEvery { webSocketCore.sendMessage(any<Map<String, Any?>>()) } returns
+                MessageSocketResponse(success = true)
+            coEvery {
+                webSocketCore.subscribeTo<AssistPipelineEvent>(capture(typeSlot), capture(dataSlot), any())
+            } returns emptyFlow()
+
+            repository.runAssistPipelineForVoice(
+                sampleRate = VOICE_SAMPLE_RATE,
+                outputTts = true,
+                pushToTalk = true,
+            )
+
+            assertEquals("phone_assist_tools/assist_pipeline/run", typeSlot.captured)
+            @Suppress("UNCHECKED_CAST")
+            val input = dataSlot.captured["input"] as Map<String, Any?>
+            assertEquals(true, input["no_vad"])
+        }
     }
 
     @Nested
