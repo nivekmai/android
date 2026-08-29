@@ -323,7 +323,7 @@ fun AssistSheetControls(
                 Spacer(Modifier.width(12.dp))
                 Text(
                     text = stringResource(commonR.string.assist_stop_recording),
-                    fontSize = 20.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
@@ -346,7 +346,7 @@ fun AssistSheetControls(
             Spacer(Modifier.width(8.dp))
             Text(
                 text = stringResource(commonR.string.assist_show_keyboard),
-                fontSize = 16.sp,
+                fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
             )
         }
@@ -371,7 +371,7 @@ fun AssistSheetControls(
             Spacer(Modifier.width(8.dp))
             Text(
                 text = stringResource(commonR.string.assist_start_recording),
-                fontSize = 16.sp,
+                fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
             )
         }

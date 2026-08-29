@@ -2,9 +2,8 @@ package io.homeassistant.companion.android.assist.service
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.service.voice.VoiceInteractionSession
 import io.homeassistant.companion.android.assist.AssistActivity
 import timber.log.Timber
@@ -34,15 +33,20 @@ class AssistVoiceInteractionSession(context: Context) : VoiceInteractionSession(
         val intent = AssistActivity.newInstance(
             context = context,
             wakeWordPhrase = wakeWord,
-        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(intent)
-
-        // Finish this session since the activity will handle everything
-
-        // Post finish() so it runs after the framework's doShow() completes.
-        // Calling finish() synchronously inside onShow() invalidates the window token
-        // before doShow() can display the session window, causing BadTokenException.
-        Handler(Looper.getMainLooper()).post { finish() }
+        ).apply {
+            action = Intent.ACTION_MAIN
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            startVoiceActivity(intent)
+        } catch (exception: SecurityException) {
+            Timber.w(exception, "Voice activity launch rejected; using assistant activity")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startAssistantActivity(intent)
+            } else {
+                context.startActivity(intent)
+            }
+        }
     }
 
     override fun onHandleAssist(state: AssistState) {
