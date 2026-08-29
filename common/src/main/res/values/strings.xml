@@ -1247,6 +1247,9 @@
     <string name="assist_shortcut">Assist shortcut</string>
     <string name="assist_start_listening">Start listening</string>
     <string name="assist_stop_listening">Stop listening</string>
+    <string name="assist_stop_recording">Stop recording</string>
+    <string name="assist_start_recording">Start recording</string>
+    <string name="assist_show_keyboard">Show keyboard</string>
     <string name="assist_listening_title">Listening for wake word</string>
     <string name="assist_listening_wakeword">Say \"%s\" to activate Assist</string>
     <string name="assist_listening_channel">Assist wake word</string>
